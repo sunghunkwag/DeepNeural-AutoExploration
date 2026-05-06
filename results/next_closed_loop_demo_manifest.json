@@ -1,0 +1,94 @@
+{
+  "accepted_mutations": [],
+  "anti_cheat_checks_passed": [
+    "random seeds explicitly recorded",
+    "train/validation/test task IDs disjoint",
+    "all task IDs recorded",
+    "no test task used in mutation acceptance",
+    "no query_y stored in memory",
+    "benchmark result file includes config and task IDs",
+    "OOD mode actually changes distribution",
+    "no query_y used in task encoding",
+    "no final test metric used in optimizer/controller",
+    "no benchmark result hardcoded"
+  ],
+  "command": "python examples/next_closed_loop_demo.py",
+  "config": {
+    "demo": true,
+    "seed": 42
+  },
+  "config_hash": "75da6c2dc5f1a7f0",
+  "git_commit": "4e9caa82199d48f657571892f96fdd82d4db195f",
+  "metric_summary": {
+    "demo_validation_loss": 9.413084983825684,
+    "prediction_error": 0.027600616216659546,
+    "rollback_count": 1
+  },
+  "ood_flags": {
+    "test": true,
+    "train": false,
+    "validation": false
+  },
+  "rejected_mutations": [
+    {
+      "accepted": false,
+      "baseline_scores": [
+        9.422870635986328,
+        25.501222610473633,
+        3.690070867538452
+      ],
+      "candidate_name": "too_large_inner_lr",
+      "candidate_scores": [
+        1555.255126953125,
+        107767312.0,
+        103.4361343383789
+      ],
+      "random_seed": 42,
+      "rollback": true,
+      "split": "validation",
+      "updates": {
+        "inner_lr": 5.0
+      }
+    }
+  ],
+  "seed_list": [
+    42
+  ],
+  "task_families": {
+    "test": [
+      "sinusoid",
+      "polynomial",
+      "piecewise_linear"
+    ],
+    "train": [
+      "sinusoid",
+      "polynomial",
+      "piecewise_linear",
+      "noisy_affine",
+      "compositional"
+    ],
+    "validation": [
+      "sinusoid",
+      "polynomial",
+      "piecewise_linear"
+    ]
+  },
+  "test_task_ids": [
+    "test-sinusoid-42-9-76946061",
+    "test-polynomial-42-10-fdf734f5",
+    "test-piecewise_linear-42-11-c31cab9b"
+  ],
+  "timestamp": "2026-05-06T15:06:50.897352+00:00",
+  "train_task_ids": [
+    "train-sinusoid-42-1-b95b5b03",
+    "train-polynomial-42-2-a7107bde",
+    "train-piecewise_linear-42-3-129cb44d",
+    "train-noisy_affine-42-4-fa087961",
+    "train-compositional-42-5-007d123e"
+  ],
+  "validation_task_ids": [
+    "validation-sinusoid-42-6-cea277a7",
+    "validation-polynomial-42-7-79eccead",
+    "validation-piecewise_linear-42-8-8d1be3bb"
+  ]
+}
