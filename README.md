@@ -2,49 +2,68 @@
 
 **Recursive Self-Improving Deep Neural Network Autonomous Exploration Algorithm (RSI-DNAX)**
 
-A PyTorch-based implementation of a neuro-symbolic deep learning architecture that combines:
+A PyTorch implementation combining:
 - **Recursive self-improvement** through meta-learning
 - **Autonomous weight-space exploration** via uncertainty-driven perturbations
-- **MAML-style meta-optimization** for fast adaptation
+- **True MAML** (torch.func.functional_call) for correct 2nd-order meta-gradients
 - **Curriculum learning** for progressive difficulty scaling
+
+---
+
+## Benchmark Results
+
+Sinusoid 5-shot regression benchmark ([Finn et al. 2017](https://arxiv.org/abs/1703.03400) protocol),
+evaluated on 500 test tasks after 2000 training epochs (seed=42).
+
+| Method | Test MSE | ±SE | Notes |
+|---|---:|---:|---|
+| Pretrain-only | 2.9441 | 0.1281 | No adaptation at test time |
+| MAML-OLD *(broken 2nd order)* | 3.7935 | 0.1893 | `deepcopy + load_state_dict` severs graph |
+| **MAML-Functional** *(ours, 2nd order ✓)* | **1.0902** | **0.0485** | `torch.func.functional_call` |
+| FOMAML *(ours, 1st order ✓)* | 1.2078 | 0.0600 | `functional_call`, first_order=True |
+
+> **MAML-Functional achieves 63% lower MSE than the deepcopy-based baseline.**  
+> See [`results/sinusoid_5shot.md`](results/sinusoid_5shot.md) for full analysis.
 
 ---
 
 ## Overview
 
-RSI-DNAX is designed to autonomously explore the weight space of deep neural networks, discovering better local minima through iterative self-improvement. The algorithm treats its own training process as a meta-learning problem, recursively optimizing how it learns.
+RSI-DNAX autonomously explores the weight space of deep neural networks,
+discovering better local minima through iterative self-improvement.
+The algorithm treats its own training process as a meta-learning problem,
+recursively optimizing how it learns.
 
 ### Key Components
 
-| Component | Description |
-|-----------|-------------|
-| `DeepNeuralAutoExplorer` | Deep residual network with built-in exploratory perturbation and uncertainty estimation |
-| `MetaLearningEngine` | MAML-style meta-learner with recursive self-improvement capability |
-| `CurriculumManager` | Progressive difficulty scaling based on model performance trends |
-| `RSI_DNAX_Driver` | Main coordination class that ties everything together |
-| `ExplorationStrategy` | Pluggable exploration strategies (uncertainty-driven, stochastic) |
+| Component | File | Description |
+|-----------|------|--------------|
+| `DeepNeuralAutoExplorer` | `rsi_dnax_core.py` | Deep residual network with exploratory perturbation and uncertainty estimation |
+| `MetaLearningEngine` | `rsi_dnax_core.py` | MAML-style meta-learner with recursive self-improvement |
+| `MetaLearningEngineFunctional` | `maml_functional.py` | Drop-in replacement using `torch.func` (correct 2nd order) |
+| `CurriculumManager` | `rsi_dnax_core.py` | Progressive difficulty scaling from performance trends |
+| `RSI_DNAX_Driver` | `rsi_dnax_core.py` | Main coordination class |
+| `ExplorationStrategy` | `rsi_dnax_core.py` | Pluggable strategies (uncertainty-driven, stochastic) |
 
 ---
 
-## Architecture Diagram
+## Architecture
 
 ```
-+----------------------+     +------------------------+
-|  RSI_DNAX_Driver     |     |   MetaLearningEngine    |
-|  (Coordinator)       |<--->|   (MAML + RSI)          |
-+----------+-----------+     +------------------------+
++----------------------+     +-----------------------------+
+|  RSI_DNAX_Driver     |     | MetaLearningEngineFunctional|
+|  (Coordinator)       |<--->| (torch.func MAML + RSI)     |
++----------+-----------+     +-----------------------------+
            |
            v
-+----------------------+
-| DeepNeuralAutoExplorer|
-| (Residual Network +    |
-|  Uncertainty Heads)    |
-+----------+-----------+
++-------------------------+
+| DeepNeuralAutoExplorer  |
+| ResidualExplorationBlock|  <- exploration_weight (learnable gate)
+| uncertainty_head        |  <- uncertainty_scale  (learnable modulator)
++----------+--------------+
            |
            +-----> CurriculumManager
-           |
            +-----> ExplorationStrategy
-                    (Uncertainty/Stochastic)
 ```
 
 ---
@@ -54,138 +73,46 @@ RSI-DNAX is designed to autonomously explore the weight space of deep neural net
 ```bash
 git clone https://github.com/sunghunkwag/DeepNeural-AutoExploration.git
 cd DeepNeural-AutoExploration
-pip install -r requirements.txt
+pip install torch numpy
 ```
 
-## Requirements
-
-- Python >= 3.8
-- PyTorch >= 2.0
-- NumPy >= 1.20
-
-```txt
-torch>=2.0.0
-numpy>=1.20.0
-```
+**Requirements:** Python >= 3.9, PyTorch >= 2.0, NumPy >= 1.20
 
 ---
 
-
 ## Quick Usage
 
-### Basic Demo
+### With Functional MAML (recommended)
 
 ```python
-from rsi_dnax_core import RSI_DNAX_Driver, DNAXConfig
+from rsi_dnax_core import DNAXConfig, DeepNeuralAutoExplorer
+from maml_functional import MetaLearningEngineFunctional
 
-# Configure the algorithm
 config = DNAXConfig(
     input_dim=64,
     hidden_dims=[128, 256, 128, 64],
     output_dim=16,
-    activation="gelu",
-    exploration_strategy="uncertainty_driven",
-    meta_batch_size=8,
+    use_second_order=True,   # now actually works correctly
+    hessian_free=False,      # True = FOMAML (faster)
     verbose=True,
 )
 
-# Initialize and train
-driver = RSI_DNAX_Driver(config)
+model  = DeepNeuralAutoExplorer(config)
+engine = MetaLearningEngineFunctional(model, config)
+
+# Single meta-update step
+loss = engine.meta_update(task_batch)
+```
+
+### Full Driver
+
+```python
+from rsi_dnax_core import RSI_DNAX_Driver, DNAXConfig
+
+driver  = RSI_DNAX_Driver(DNAXConfig(input_dim=64, output_dim=16, verbose=True))
 results = driver.recursive_self_improve(n_epochs=500)
-
 print(f"Final loss: {results['final_loss']:.4f}")
-print(f"Total improvements: {results['total_improvements']}")
 ```
-
-### Custom Training Loop
-
-```python
-for step in range(1000):
-    log = driver.train_step(batch_size=16)
-    
-    # Access training metrics
-    print(f"Step {step}: loss={log['meta_loss']:.4f}, "
-          f"bonus={log['exploration_bonus']:.4f}")
-```
-
----
-
-## Configuration
-
-The `DNAXConfig` dataclass provides full control over all algorithmic parameters:
-
-```python
-@dataclass
-class DNAXConfig:
-    # Network architecture
-    input_dim: int = 128
-    hidden_dims: List[int] = [256, 512, 256, 128]
-    output_dim: int = 32
-    activation: str = "gelu"  # [relu, gelu, silu, tanh]
-    dropout_rate: float = 0.15
-    
-    # Meta-learning
-    meta_learning_rate: float = 0.01
-    inner_lr: float = 0.001
-    inner_steps: int = 5
-    meta_batch_size: int = 16
-    
-    # Exploration
-    exploration_strategy: str = "uncertainty_driven"
-    exploration_noise_scale: float = 0.02
-    noise_decay: float = 0.995
-    min_noise_scale: float = 0.001
-    
-    # Self-improvement
-    improvement_threshold: float = 0.01
-    max_recursion_depth: int = 10
-    self_refine_interval: int = 100
-    use_second_order: bool = True
-    hessian_free: bool = True
-    
-    # Curriculum learning
-    curriculum_enabled: bool = True
-    curriculum_growth_rate: float = 1.1
-    initial_difficulty: float = 0.1
-    max_difficulty: float = 1.0
-```
-
----
-
-## Algorithmic Details
-
-### 1. Recursive Self-Improvement Loop
-
-The core innovation is that the training process itself is treated as a meta-learning objective:
-
-```python
-# Pseudo-code for the recursive self-improvement loop
-def recursive_self_improve(task_batch, depth=0):
-    if depth >= MAX_DEPTH:
-        return
-    
-    # Step 1: Standard meta-update (outer loop)
-    meta_loss = meta_update(task_batch)
-    
-    # Step 2: Check improvement rate
-    improvement_rate = compute_improvement_rate(history)
-    
-    # Step 3: Recurse if improving
-    if improvement_rate > threshold:
-        recursive_self_improve(fresh_tasks, depth + 1)
-```
-
-### 2. MAML-Style Meta-Learning
-
-The inner loop adapts to specific tasks using fast gradient descent on a support set, then the outer loop optimizes the initialization to minimize query set loss.
-
-### 3. Uncertainty-Driven Exploration
-
-Each layer estimates its own epistemic uncertainty. The exploration strategy uses this to guide weight perturbations toward uncertain regions of the parameter space.
-
-### 4. Curriculum Learning
-
-Difficulty is scaled progressively based on a polynomial trend analysis of the performance history. The model is never overwhelmed, and plateaus trigger difficulty reduction.
 
 ---
 
@@ -193,49 +120,72 @@ Difficulty is scaled progressively based on a polynomial trend analysis of the p
 
 ```
 DeepNeural-AutoExploration/
-├── rsi_dnax_core.py      # Core algorithm implementation
-├── README.md              # This file
-├── requirements.txt       # Python dependencies
-├── .gitignore             # Git ignore patterns
-└── LICENSE                # Apache 2.0 License
+├── rsi_dnax_core.py          # Core architecture + original MetaLearningEngine
+├── maml_functional.py        # True MAML via torch.func.functional_call
+├── benchmarks/
+│   └── sinusoid_benchmark.py # Reproducible 5-shot sinusoid benchmark
+├── results/
+│   └── sinusoid_5shot.md     # Benchmark results + analysis
+├── tests/
+│   ├── test_rsi_dnax.py      # 16 unit tests (pytest)
+│   └── test_maml_functional.py # 7 MAML-specific tests (T17-T23)
+├── requirements.txt
+└── LICENSE                   # Apache 2.0
+```
+
+---
+
+## Running Tests
+
+```bash
+pip install pytest
+pytest tests/ -v
+# Expected: 23 passed
+```
+
+---
+
+## Reproduce Benchmark
+
+```bash
+python benchmarks/sinusoid_benchmark.py --seed 42
 ```
 
 ---
 
 ## Research Notes
 
-This implementation explores the intersection of:
-- **Meta-learning** (finding better parameter initializations)
-- **Neuro-symbolic reasoning** (embedding uncertainty estimation in the architecture)
-- **Recursive self-improvement** (iteratively improving the learning process itself)
-- **Autonomous exploration** (discovering new solutions without supervision)
+This implementation explores:
+- **Meta-learning** — finding better parameter initializations via MAML
+- **Correct 2nd-order gradients** — `torch.func.functional_call` preserves
+  the computation graph through inner-loop adaptation
+- **Neuro-symbolic uncertainty** — per-layer epistemic uncertainty estimation
+  with learnable scaling parameters that receive proper gradients
+- **Recursive self-improvement** — iteratively improving the learning process
 
 ---
 
 ## License
 
-Apache License 2.0 - See [LICENSE](LICENSE) for details.
+Apache License 2.0 — see [LICENSE](LICENSE) for details.
 
 ---
 
 ## Author
 
-**sungunhwag**
-
-Recursive Self-Improving AI Architectures Research
+**sunghunkwag** — Recursive Self-Improving AI Architectures Research
 
 ---
 
 ## Citation
 
-If you use this code in your research, please consider citing:
-
 ```bibtex
-@misc{sunghunkwag2025rsidnax,
-  author = {sungunhwag},
-  title = {RSI-DNAX: Recursive Self-Improving Deep Neural Network Autonomous Exploration Algorithm},
-  year = {2025},
+@misc{sunghunkwag2026rsidnax,
+  author    = {sunghunkwag},
+  title     = {RSI-DNAX: Recursive Self-Improving Deep Neural Network
+               Autonomous Exploration Algorithm},
+  year      = {2026},
   publisher = {GitHub},
-  url = {https://github.com/sunghunkwag/DeepNeural-AutoExploration}
+  url       = {https://github.com/sunghunkwag/DeepNeural-AutoExploration}
 }
 ```
