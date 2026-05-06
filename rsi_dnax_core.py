@@ -160,7 +160,7 @@ class ResidualExplorationBlock(nn.Module):
             out = out + perturbation
 
         # uncertainty_scale modulates per-feature variance estimate (learnable)
-        raw_var = torch.var(out, dim=-1, keepdim=True)  # [B, 1]
+        raw_var = torch.var(out, dim=-1, keepdim=True, unbiased=False)  # [B, 1]
         scale = F.softplus(self.uncertainty_scale).mean()  # positive scalar
         uncertainty = raw_var * scale
 
@@ -192,9 +192,9 @@ class DeepNeuralAutoExplorer(nn.Module):
             self.layers.append(block)
             # Uncertainty aggregation head per layer
             self.layer_uncertainties.append(nn.Sequential(
-                nn.Linear(dims[i + 1], dims[i + 1] // 2),
+                nn.Linear(dims[i + 1], max(1, dims[i + 1] // 2)),
                 nn.ReLU(),
-                nn.Linear(dims[i + 1] // 2, 1),
+                nn.Linear(max(1, dims[i + 1] // 2), 1),
                 nn.Sigmoid()
             ))
 
