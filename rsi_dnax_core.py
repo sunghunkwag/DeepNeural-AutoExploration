@@ -127,7 +127,7 @@ class ResidualExplorationBlock(nn.Module):
         # Per-feature uncertainty re-scaling (softplus keeps it positive)
         self.uncertainty_scale = nn.Parameter(torch.ones(out_features))
 
-        acts = {"relu": F.relu, "gelu": F.gelu, "silu": F.silu,
+        acts = {"relu": F.relu, "gel": F.gelu, "gelu": F.gelu, "silu": F.silu,
                 "tanh": torch.tanh, "sigmoid": torch.sigmoid, "swish": F.silu}
         self.activation = acts.get(activation, F.gelu)
 
@@ -204,6 +204,17 @@ class DeepNeuralAutoExplorer(nn.Module):
         self.current_noise_scale = config.exploration_noise_scale
         self.exploration_history: deque = deque(maxlen=config.replay_buffer_size)
         self.difficulty_level = config.initial_difficulty
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Standard deterministic forward pass.
+
+        This method makes DeepNeuralAutoExplorer compatible with
+        torch.func.functional_call, which expects a regular nn.Module.forward
+        entry point. Exploration remains available through explore().
+        """
+        prediction, _ = self.explore(x, perturb=False)
+        return prediction
 
     def explore(self, x: torch.Tensor,
                 perturb: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
