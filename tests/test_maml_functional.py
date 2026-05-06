@@ -94,15 +94,31 @@ def test_T19_second_order_graph_intact(net):
     assert has_grad_fn, "2nd order: adapted params have no grad_fn — graph broken"
 
 
-# ── T20: FOMAML — adapted params are DETACHED (no grad_fn) ──────────────────
+# ── T20: FOMAML — Hessian path is cut, meta-gradient path remains ─────────────
 
-def test_T20_fomaml_detached(net):
-    params  = dict(net.named_parameters())
-    sx, sy  = torch.randn(6, 16), torch.randn(6, 8)
+def test_T20_fomaml_cuts_hessian_path_but_keeps_meta_gradient(net):
+    """
+    FOMAML should detach inner-loop gradients so second-order curvature terms
+    are removed. It should not detach the adapted parameters themselves,
+    because the outer loss still needs a first-order meta-gradient path back
+    to the original parameters.
+    """
+    params = dict(net.named_parameters())
+    sx, sy = torch.randn(6, 16), torch.randn(6, 8)
+    qx, qy = torch.randn(4, 16), torch.randn(4, 8)
+
     adapted = maml_inner_loop(net, params, sx, sy,
-                               inner_lr=0.01, inner_steps=3, first_order=True)
-    has_grad_fn = any(v.grad_fn is not None for v in adapted.values())
-    assert not has_grad_fn, "FOMAML: adapted params should be detached"
+                              inner_lr=0.01, inner_steps=3, first_order=True)
+
+    assert any(v.grad_fn is not None for v in adapted.values()), \
+        "FOMAML should keep a first-order meta-gradient path"
+
+    loss = F.mse_loss(functional_forward(net, adapted, qx), qy)
+    grads = torch.autograd.grad(loss, list(params.values()), allow_unused=True)
+    assert all(g is not None for g in grads), \
+        "FOMAML outer loss did not produce gradients for all meta-parameters"
+    assert all(torch.isfinite(g).all() for g in grads), \
+        "NaN/Inf detected in FOMAML meta-gradients"
 
 
 # ── T21: outer loss gradients flow to ORIGINAL meta-params ───────────────────
