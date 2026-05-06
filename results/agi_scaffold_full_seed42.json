@@ -1,0 +1,102 @@
+{
+  "mode": "full",
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "per_seed": [
+    {
+      "adaptation_improvement_after_k": 1.7778416420022647,
+      "ood_generalization_gap": 34.5275097767512,
+      "task_inference_proxy_loss": 5.277867249647776,
+      "world_model_prediction_error": 0.00015830072516109794,
+      "world_model_error_reduction": 1.251265892657102,
+      "memory_retrieval_precision": 1.0,
+      "planning_success_rate": 1.0,
+      "exploration_efficiency": 1.7778416242238486,
+      "self_improvement_acceptance_rate": 0.0,
+      "rollback_count": 1.0,
+      "validation_vs_test_gap": 34.5275097767512,
+      "baseline_to_adapted_test_delta": 14.03675258954366
+    },
+    {
+      "adaptation_improvement_after_k": 0.22585508823394776,
+      "ood_generalization_gap": 15.859265467382611,
+      "task_inference_proxy_loss": 2.5843756556510926,
+      "world_model_prediction_error": 0.0002592916425783187,
+      "world_model_error_reduction": 1.3055857305589598,
+      "memory_retrieval_precision": 1.0,
+      "planning_success_rate": 1.0,
+      "exploration_efficiency": 0.2258550859753969,
+      "self_improvement_acceptance_rate": 0.0,
+      "rollback_count": 1.0,
+      "validation_vs_test_gap": 15.859265467382611,
+      "baseline_to_adapted_test_delta": 0.5584749678770713
+    },
+    {
+      "adaptation_improvement_after_k": 1.2194112728039423,
+      "ood_generalization_gap": 6.111713256154742,
+      "task_inference_proxy_loss": 7.2619931956132255,
+      "world_model_prediction_error": 0.00015526243078056723,
+      "world_model_error_reduction": 1.4958902078069514,
+      "memory_retrieval_precision": 1.0,
+      "planning_success_rate": 1.0,
+      "exploration_efficiency": 1.2194112606098297,
+      "self_improvement_acceptance_rate": 0.0,
+      "rollback_count": 1.0,
+      "validation_vs_test_gap": 6.111713256154742,
+      "baseline_to_adapted_test_delta": 5.739193471272788
+    }
+  ],
+  "aggregate": {
+    "adaptation_improvement_after_k": {
+      "mean": 1.0743693343467182,
+      "stderr": 0.45385145833667734
+    },
+    "ood_generalization_gap": {
+      "mean": 18.832829500096185,
+      "stderr": 8.336584737718265
+    },
+    "task_inference_proxy_loss": {
+      "mean": 5.041412033637364,
+      "stderr": 1.3554777465804257
+    },
+    "world_model_prediction_error": {
+      "mean": 0.0001909515995066613,
+      "stderr": 3.4181276177963694e-05
+    },
+    "world_model_error_reduction": {
+      "mean": 1.3509139436743378,
+      "stderr": 0.07416479189122928
+    },
+    "memory_retrieval_precision": {
+      "mean": 1.0,
+      "stderr": 0.0
+    },
+    "planning_success_rate": {
+      "mean": 1.0,
+      "stderr": 0.0
+    },
+    "exploration_efficiency": {
+      "mean": 1.0743693236030252,
+      "stderr": 0.4538514537981628
+    },
+    "self_improvement_acceptance_rate": {
+      "mean": 0.0,
+      "stderr": 0.0
+    },
+    "rollback_count": {
+      "mean": 1.0,
+      "stderr": 0.0
+    },
+    "validation_vs_test_gap": {
+      "mean": 18.832829500096185,
+      "stderr": 8.336584737718265
+    },
+    "baseline_to_adapted_test_delta": {
+      "mean": 6.7781403428978395,
+      "stderr": 3.9253683420890244
+    }
+  }
+}
