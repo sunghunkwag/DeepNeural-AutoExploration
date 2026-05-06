@@ -226,3 +226,124 @@ Recommended next upgrades:
 ## License
 
 Apache License 2.0. See `LICENSE` for details.
+
+## Next architecture upgrade: connected learned closed loop
+
+This upgrade moves the repository further toward an **AGI-oriented prototype** and **closed-loop learning scaffold** without claiming AGI, human-level intelligence, true recursive self-improvement, or state-of-the-art results.  The important change is that the new modules are connected in the execution path rather than only logged as separate components.
+
+### New learned context encoder
+
+- `learned_task_encoder.py` adds `LearnedTaskEncoder`, a CPU-runnable DeepSets-style **learned context encoder**.
+- It encodes support pairs `[support_x_i, support_y_i]`, aggregates pair features with permutation-invariant mean/max pooling, and emits `z_task`.
+- It intentionally has no `query_y` argument in the encoding API.
+- `TaskConditionedRegressor`, `train_task_encoder`, and `evaluate_task_encoder` expose training loss and validation reconstruction metrics on procedural function families.
+- The learned encoder augments the older `TaskInferenceModule`; the older hand-crafted module remains available for compatibility and ablations.
+
+### Model-based update selection
+
+- `model_based_controller.py` adds `ModelBasedController` and typed `UpdateAction` candidates.
+- The controller receives `z_task`, a memory summary, and candidate update operators, calls a learned `WorldModel`, ranks candidate updates by predicted improvement, and logs predicted-vs-actual improvement error after execution.
+- Candidate actions include inner-loop learning rate, inner steps, memory retrieval `k`, first-order/second-order flag metadata, planner horizon, and exploration noise scale.
+- Benchmarks compare the learned world-model controller against a deliberately wrong world model so the benchmark can detect whether planning is doing useful work.
+
+### Memory-conditioned adaptation
+
+- `CognitiveCore` now exposes `memory_conditioned_inner_lr` and `adapt_memory_conditioned`.
+- Retrieved non-test episodes influence the inner-loop learning rate through similarity-weighted reward summaries.
+- Relevant memory can improve adaptation; corrupted or irrelevant memory is tested to avoid treating insertion order or arbitrary logs as transfer.
+- `EpisodicMemory` continues to reject records marked as containing query targets and enforces bounded capacity.
+
+### Controlled operator mutation
+
+- `operator_mutation.py` adds controlled mutation candidates beyond tiny scalar tweaks:
+  - inner learning-rate scale changes
+  - inner-step changes
+  - exploration policy switches
+  - memory retrieval `k` changes
+  - learned-vs-hand-crafted encoder selection metadata
+  - task-encoder on/off metadata
+  - planner horizon changes
+  - first-order vs second-order MAML metadata
+  - residual width multiplier metadata for small models
+  - uncertainty and intrinsic objective weighting coefficients
+- `OperatorMutationController` snapshots state, evaluates candidates only on validation tasks, accepts only consistent improvements above threshold, rolls back rejected candidates, and preserves accepted/rejected mutation logs.
+- Final test tasks are forbidden for mutation acceptance.
+
+### Experiment manifests and anti-cheat checks
+
+- `experiment_manifest.py` writes benchmark/demo manifests with timestamp, git commit, command, seed list, train/validation/test task IDs, task families, OOD flags, accepted/rejected mutations, metric summary, config hash, and anti-cheat checks.
+- Manifest validation checks disjoint splits, explicit seeds, no test-split mutation acceptance, no query targets stored in memory, config/task IDs in result metadata, and OOD distribution flags.
+- The manifest is intended to make leakage visible rather than to claim the system is impossible to fool.
+
+### Next benchmark commands
+
+```bash
+python benchmarks/next_agi_scaffold_benchmark.py --mode smoke --seed 42
+python benchmarks/next_agi_scaffold_benchmark.py --mode quick --seed 42
+python benchmarks/next_agi_scaffold_benchmark.py --mode full --seed 42
+```
+
+Modes:
+
+- `smoke`: very fast CPU sanity check.
+- `quick`: at least two seeds with ablations.
+- `full`: five seeds with mean, standard error, per-seed results, JSON output, and manifest output.
+
+Required ablations in the next benchmark include no adaptation, functional MAML only, MAML plus learned task encoder, MAML plus memory, MAML plus world-model controller, full loop, full loop without self-improvement, full loop with shuffled memory, and full loop with wrong world model.
+
+### Next demo command
+
+```bash
+python examples/next_closed_loop_demo.py
+```
+
+The demo prints a transparent vertical slice:
+
+```text
+support/context
+-> learned task encoder
+-> task latent
+-> memory retrieval
+-> memory-conditioned adaptation
+-> world-model prediction of candidate updates/actions
+-> controller selects update/action
+-> validation evaluates outcome
+-> self-improvement accepts/rejects mutation
+-> manifest records the run
+```
+
+### Supported and unsupported claims
+
+Supported claims:
+
+- This is an **AGI-oriented prototype** for studying closed-loop learning mechanics.
+- It includes a learned support-only context encoder.
+- It includes model-based update selection using a learned world model.
+- It includes memory-conditioned adaptation.
+- It includes controlled operator mutation with validation-gated self-improvement candidates.
+- It includes manifests and anti-cheat tests intended to expose leakage and ablation failures.
+
+Unsupported claims:
+
+- This is not AGI.
+- This does not prove general intelligence.
+- This does not demonstrate human-level intelligence.
+- This does not achieve true recursive self-improvement.
+- This is not a singularity system.
+- This is not claimed to be state of the art.
+
+### Current limitations
+
+- The learned task encoder is small and trained with a reconstruction proxy, not a broad task-language or multimodal objective.
+- The world model predicts compact latent improvement proxies rather than rich environment dynamics.
+- Operator mutations are metadata/config-level and small-model-safe; they are not unconstrained architecture search.
+- Benchmarks are CPU-sized and procedural, so they test mechanics and leakage resistance rather than broad real-world intelligence.
+- Memory transfer is similarity/reward conditioned and can still be brittle under large distribution shifts.
+
+### Next recommended upgrade path
+
+- Train the task encoder and world model jointly over longer task curricula.
+- Add uncertainty-aware ensembles for world-model planning and mutation risk estimation.
+- Add richer memory consolidation with train/validation/test access policies enforced at the data-structure level.
+- Extend procedural tasks toward compositional sequence/action problems where planning horizon and memory retrieval are both necessary.
+- Add stronger statistical acceptance tests for self-improvement across more seeds and task families.

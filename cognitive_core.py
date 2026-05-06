@@ -248,6 +248,7 @@ class SelfImprovementController:
         self.min_consistent_wins = min_consistent_wins
         self.log: List[Dict[str, object]] = []
         self.rollback_count = 0
+        self.accepted_mutation_count = 0
 
     def snapshot(self) -> Dict[str, float]:
         return copy.deepcopy(self.state)
@@ -290,6 +291,7 @@ class SelfImprovementController:
         accepted = wins >= self.min_consistent_wins and mean_improvement > self.improvement_threshold
         if accepted:
             self.state = trial
+            self.accepted_mutation_count += 1
         else:
             self.restore(before)
         entry = {
@@ -300,6 +302,9 @@ class SelfImprovementController:
             "mean_improvement": mean_improvement,
             "accepted": accepted,
             "rollback_count": self.rollback_count,
+            "rollback": not accepted,
+            "random_seed": int(self.state.get("seed", 0)) if isinstance(self.state.get("seed", 0), (int, float)) else 0,
+            "split": "validation",
         }
         self.log.append(entry)
         return entry
@@ -323,7 +328,7 @@ class CognitiveCore:
         self.task_inference = task_inference or TaskInferenceModule()
         self.intrinsic = IntrinsicObjectiveSystem()
         self.self_improvement = SelfImprovementController(
-            {"inner_lr": config.inner_lr, "exploration_noise_scale": config.exploration_noise_scale},
+            {"inner_lr": config.inner_lr, "inner_steps": config.inner_steps, "exploration_noise_scale": config.exploration_noise_scale, "seed": config.seed or 0},
             improvement_threshold=0.0,
         )
 
@@ -350,7 +355,7 @@ class CognitiveCore:
         self.memory.add(
             MemoryRecord(
                 task_id=task.task_id,
-                observation=torch.cat([sx.flatten(), sy.flatten()])[: self.task_inference.embedding_dim],
+                observation=torch.cat([sx.flatten(), sy.flatten()])[: int(getattr(self.task_inference, "embedding_dim", getattr(self.task_inference, "latent_dim", 8)))],
                 action=torch.tensor([inner_lr if inner_lr is not None else self.config.inner_lr]),
                 reward=before - after,
                 loss=after,
@@ -368,6 +373,38 @@ class CognitiveCore:
             "query_loss_before": before,
             "query_loss_after": after,
         }
+
+
+    def memory_conditioned_inner_lr(self, embedding: torch.Tensor, base_lr: Optional[float] = None, k: int = 1) -> Tuple[float, List[Tuple[MemoryRecord, float]]]:
+        """Use retrieved non-test episodes to modulate adaptation learning rate."""
+        lr = float(base_lr if base_lr is not None else self.config.inner_lr)
+        retrieved = self.memory.retrieve(embedding, k=k)
+        if not retrieved:
+            return lr, retrieved
+        weighted_reward = 0.0
+        weight_sum = 0.0
+        for record, score in retrieved:
+            if record.split == "test":
+                continue
+            weight = max(0.0, float(score))
+            weighted_reward += weight * float(record.reward)
+            weight_sum += weight
+        if weight_sum <= 1e-8:
+            return lr, retrieved
+        signal = max(-0.5, min(0.5, weighted_reward / weight_sum))
+        return float(max(1e-4, min(0.2, lr * (1.0 + signal)))), retrieved
+
+    def adapt_memory_conditioned(self, task, memory_k: int = 1, use_memory: bool = True) -> Dict[str, object]:
+        """Adapt with a learning rate selected from support-only task latent and memory."""
+        embedding = self.task_inference.infer(task.support_x, task.support_y)
+        if use_memory:
+            conditioned_lr, retrieved = self.memory_conditioned_inner_lr(embedding, self.config.inner_lr, k=memory_k)
+        else:
+            conditioned_lr, retrieved = self.config.inner_lr, []
+        log = self.adapt_and_evaluate(task, inner_lr=conditioned_lr)
+        log["conditioned_inner_lr"] = conditioned_lr
+        log["retrieved_for_adaptation"] = retrieved
+        return log
 
     def validation_evaluator(self, tasks: Sequence[object]) -> Callable[[Dict[str, float], Sequence[object]], List[float]]:
         def _eval(state: Dict[str, float], validation_tasks: Sequence[object]) -> List[float]:
