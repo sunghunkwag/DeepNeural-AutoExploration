@@ -72,10 +72,23 @@ def verify(result_path: Path) -> None:
         raise AssertionError("result missing mutation log")
 
     aggregate = result["aggregate"]
-    for key in ("controller_call_count", "world_model_call_count"):
+    for key in ("controller_call_count", "world_model_call_count", "accepted_operator_count"):
         value = aggregate.get(key, {}).get("mean")
         if value is None or float(value) <= 0.0:
             raise AssertionError(f"aggregate metric {key} must be positive")
+    for key in (
+        "improvement_velocity",
+        "operator_reuse_success",
+        "controller_prediction_error_reduction",
+        "ood_transfer_after_accepted_mutations",
+        "accepted_mutation_quality",
+    ):
+        if key not in aggregate:
+            raise AssertionError(f"aggregate missing operator-level metric {key}")
+
+    per_seed = result.get("per_seed") or []
+    if not per_seed or not per_seed[0].get("operator_genome", {}).get("accepted_gene_ids"):
+        raise AssertionError("result missing accepted operator genome entries")
 
     for mutation in manifest.get("accepted_mutations", []) + manifest.get("rejected_mutations", []):
         if mutation.get("split") == "test" or mutation.get("accepted_on_split") == "test":

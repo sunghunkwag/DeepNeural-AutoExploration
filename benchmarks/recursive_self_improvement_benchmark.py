@@ -25,6 +25,14 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+from adaptation_operators import (
+    OperatorExecutionContext,
+    OperatorGene,
+    OperatorGenome,
+    execute_operator,
+    operator_action_vector,
+    select_gene_with_world_model,
+)
 from cognitive_core import EpisodicMemory, MemoryRecord, TaskInferenceModule, WorldModel
 from experiment_manifest import build_manifest, validate_manifest, write_manifest
 from learned_task_encoder import LearnedTaskEncoder, TaskConditionedRegressor, train_task_encoder
@@ -221,6 +229,208 @@ def _memory_summary(z: torch.Tensor, memory: Optional[EpisodicMemory], k: int) -
     return summary
 
 
+def _context(
+    model: DeepNeuralAutoExplorer,
+    task: SyntheticTask,
+    state: Dict[str, object],
+    encoder: LearnedTaskEncoder,
+    memory: Optional[EpisodicMemory],
+    world_model: Optional[WorldModel],
+) -> OperatorExecutionContext:
+    z = _infer_task(state, encoder, task)
+    return OperatorExecutionContext(
+        model=model,
+        task=task,
+        task_embedding=z,
+        base_inner_lr=float(state.get("inner_lr", 0.01)),
+        inner_steps=int(state.get("inner_steps", 1)),
+        memory=memory,
+        memory_k=max(1, int(state.get("memory_retrieval_k", 1))),
+        world_model=world_model,
+        recent_losses=_history_tensor(state),
+    )
+
+
+def _gene_update_actions(genome: OperatorGenome) -> List[UpdateAction]:
+    actions: List[UpdateAction] = []
+    for gene in genome.accepted_genes():
+        vec = operator_action_vector(gene)
+        actions.append(
+            UpdateAction(
+                gene.gene_id,
+                inner_lr=float(vec[0]),
+                inner_steps=max(1, int(round(float(vec[1])))),
+                memory_k=max(1, int(round(float(vec[2]))) if float(vec[2]) > 0 else 1),
+                planner_horizon=max(1, int(round(float(vec[3])))),
+                exploration_noise_scale=float(vec[4]),
+            )
+        )
+    return actions
+
+
+def _assert_operator_diversity(operator_scores: Dict[str, Sequence[float]], min_range: float = 1e-8) -> None:
+    values = [float(v) for scores in operator_scores.values() for v in scores]
+    if len(operator_scores) < 2 or not values:
+        raise RuntimeError("operator benchmark needs at least two executable operators")
+    means = [float(mean(scores)) for scores in operator_scores.values() if scores]
+    if not means or max(means) - min(means) <= min_range:
+        raise RuntimeError("all adaptation operators appear to be dead code")
+
+
+def _collect_operator_transitions(
+    train_tasks: Sequence[SyntheticTask],
+    state: Dict[str, object],
+    encoder: LearnedTaskEncoder,
+    memory: EpisodicMemory,
+    genome: OperatorGenome,
+    world_model: Optional[WorldModel] = None,
+) -> Tuple[List[ControllerTransition], Dict[str, List[float]]]:
+    model = _make_model(state)
+    transitions: List[ControllerTransition] = []
+    scores_by_operator: Dict[str, List[float]] = {gene.gene_id: [] for gene in genome.accepted_genes()}
+    for task in train_tasks:
+        z = _infer_task(state, encoder, task)
+        summary = _memory_summary(z, memory, max(1, int(state.get("memory_retrieval_k", 1))))
+        history = _history_tensor(state)
+        for gene in genome.accepted_genes():
+            trace = execute_operator(gene, _context(model, task, state, encoder, memory, world_model))
+            transitions.append(ControllerTransition(z, summary, history, operator_action_vector(gene), trace.improvement))
+            scores_by_operator[gene.gene_id].append(trace.query_loss_after)
+    _assert_operator_diversity(scores_by_operator)
+    return transitions, scores_by_operator
+
+
+def _train_world_model_from_operator_transitions(seed: int, transitions: Sequence[ControllerTransition]) -> Tuple[WorldModel, float, float]:
+    wm = WorldModel(latent_dim=8, action_dim=6, hidden_dim=32, seed=seed)
+    if not transitions:
+        return wm, 0.0, 0.0
+    latent = []
+    actions = []
+    next_latent = []
+    for item in transitions:
+        state = _fit(item.z_task, 8) + 0.5 * _fit(item.memory_summary, 8)
+        nxt = state.clone()
+        nxt[0] = float(item.actual_improvement)
+        latent.append(state)
+        actions.append(_fit(item.action_vector, 6))
+        next_latent.append(nxt)
+    batch = (torch.stack(latent), torch.stack(actions), torch.stack(next_latent))
+    opt = torch.optim.Adam(wm.parameters(), lr=0.02)
+    initial = float(wm.prediction_loss(*batch).detach())
+    for _ in range(40):
+        wm.train_step(batch, opt)
+    final = float(wm.prediction_loss(*batch).detach())
+    return wm, initial, final
+
+
+def _evaluate_tasks_operator(
+    tasks: Sequence[SyntheticTask],
+    state: Dict[str, object],
+    encoder: LearnedTaskEncoder,
+    memory: Optional[EpisodicMemory],
+    genome: OperatorGenome,
+    *,
+    meta_controller: Optional[LearnedMetaController] = None,
+    world_model: Optional[WorldModel] = None,
+    random_controller: Optional[RandomController] = None,
+    selector_kind: str = "active",
+    track_controller: bool = False,
+) -> Tuple[List[float], List[float], List[str], List[Dict[str, object]]]:
+    model = _make_model(state)
+    losses: List[float] = []
+    improvements: List[float] = []
+    selected_ids: List[str] = []
+    traces: List[Dict[str, object]] = []
+    for task in tasks:
+        z = _infer_task(state, encoder, task)
+        active_memory = memory if bool(state.get("use_memory_conditioning", True)) else None
+        gene = genome.active_gene()
+        decision = None
+        if selector_kind == "learned" and meta_controller is not None:
+            decision = meta_controller.select_action(z, active_memory, memory_k=max(1, int(state.get("memory_retrieval_k", 1))), performance_history=_history_tensor(state))
+            gene = genome.genes.get(decision.selected.name, gene)
+        elif selector_kind == "world" and world_model is not None:
+            summary = _memory_summary(z, active_memory, max(1, int(state.get("memory_retrieval_k", 1))))
+            gene, _ = select_gene_with_world_model(genome, z, summary, world_model)
+        elif selector_kind == "random" and random_controller is not None:
+            action = random_controller.select_action()
+            gene = genome.genes.get(action.name, gene)
+        elif selector_kind == "fixed":
+            gene = genome.accepted_genes()[0]
+        trace = execute_operator(gene, _context(model, task, state, encoder, active_memory, world_model))
+        if decision is not None and track_controller:
+            meta_controller.log_actual_outcome(decision, trace.improvement)
+        losses.append(trace.query_loss_after)
+        improvements.append(trace.improvement)
+        selected_ids.append(gene.gene_id)
+        traces.append(trace.to_dict())
+    return losses, improvements, selected_ids, traces
+
+
+def _evaluate_gene_on_tasks(
+    gene: OperatorGene,
+    tasks: Sequence[SyntheticTask],
+    state: Dict[str, object],
+    encoder: LearnedTaskEncoder,
+    memory: EpisodicMemory,
+    world_model: Optional[WorldModel],
+) -> List[float]:
+    model = _make_model(state)
+    return [execute_operator(gene, _context(model, task, state, encoder, memory, world_model)).query_loss_after for task in tasks]
+
+
+def _validate_operator_candidate(
+    genome: OperatorGenome,
+    candidate: OperatorGene,
+    validation_tasks: Sequence[SyntheticTask],
+    state: Dict[str, object],
+    encoder: LearnedTaskEncoder,
+    memory: EpisodicMemory,
+    world_model: Optional[WorldModel],
+    *,
+    generation: int,
+    seed: int,
+    improvement_threshold: float = 1e-4,
+) -> Dict[str, object]:
+    if not validation_tasks:
+        raise ValueError("validation_tasks are required for operator mutation acceptance")
+    if any(task.split == "test" for task in validation_tasks):
+        raise ValueError("test tasks cannot be used for operator mutation acceptance")
+    snapshot = genome.snapshot()
+    baseline_gene = genome.active_gene()
+    baseline_scores = _evaluate_gene_on_tasks(baseline_gene, validation_tasks, state, encoder, memory, world_model)
+    candidate_scores = _evaluate_gene_on_tasks(candidate, validation_tasks, state, encoder, memory, world_model)
+    deltas = [b - c for b, c in zip(baseline_scores, candidate_scores)]
+    wins = sum(delta > improvement_threshold for delta in deltas)
+    mean_improvement = float(mean(deltas))
+    win_rate = float(wins / max(1, len(deltas)))
+    accepted = mean_improvement > improvement_threshold and wins >= max(1, math.ceil(len(validation_tasks) * 0.6))
+    if accepted:
+        genome.accept(candidate)
+    else:
+        genome.reject(candidate)
+        genome.restore(snapshot)
+    return {
+        "candidate_name": candidate.gene_id,
+        "candidate_operator": candidate.operator_name,
+        "operator_type": "adaptation_operator",
+        "operator_gene": candidate.to_dict(),
+        "baseline_operator": baseline_gene.to_dict(),
+        "baseline_scores": [float(x) for x in baseline_scores],
+        "candidate_scores": [float(x) for x in candidate_scores],
+        "mean_improvement": mean_improvement,
+        "win_rate": win_rate,
+        "consistent_wins": wins,
+        "accepted": accepted,
+        "rollback": not accepted,
+        "random_seed": seed,
+        "split": "validation",
+        "generation": generation,
+        "updates": {"active_operator_gene": candidate.gene_id, "operator_name": candidate.operator_name},
+        "runtime_effect_keys": ["adaptation_operator", "operator_gene"],
+    }
+
+
 def _collect_controller_transitions(
     train_tasks: Sequence[SyntheticTask],
     state: Dict[str, object],
@@ -336,30 +546,35 @@ def _evaluate_ablation_table(
     val_tasks: Sequence[SyntheticTask],
     state: Dict[str, object],
     state_before_mutation: Dict[str, object],
-    no_rollback_state: Dict[str, object],
+    genome: OperatorGenome,
+    genome_before_mutation: OperatorGenome,
+    no_rollback_genome: OperatorGenome,
     encoder: LearnedTaskEncoder,
     decoder: TaskConditionedRegressor,
     memory: EpisodicMemory,
     meta_controller: LearnedMetaController,
-    world_controller: ModelBasedController,
-    wrong_world_controller: ModelBasedController,
+    world_model: WorldModel,
+    wrong_world_model: WorldModel,
     random_controller: RandomController,
 ) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, object]]:
     no_adapt_model = _make_model(_state_for_no_controller(state))
     no_adaptation = [_loss_no_adapt(no_adapt_model, t) for t in test_tasks]
-    functional, _, _ = _evaluate_tasks(test_tasks, _state_for_no_controller(state), encoder, None, controller_kind="fixed")
+    functional_genome = OperatorGenome([gene for gene in genome.accepted_genes() if gene.operator_name == "functional_maml"] or [genome.accepted_genes()[0]])
+    memory_genes = [gene for gene in genome.accepted_genes() if gene.operator_name == "memory_gated_gradient_scaling"]
+    memory_genome = OperatorGenome(memory_genes or [genome.active_gene()])
+    functional, _, _, _ = _evaluate_tasks_operator(test_tasks, _state_for_no_controller(state), encoder, None, functional_genome, selector_kind="fixed")
     encoder_only = _encoder_decoder_loss(decoder, encoder, test_tasks)
-    memory_only, _, _ = _evaluate_tasks(test_tasks, _state_for_no_controller(state), encoder, memory, controller_kind="none")
-    world_losses, _, world_selected = _evaluate_tasks(test_tasks, state, encoder, memory, world_controller=world_controller, controller_kind="world", track_controller=True)
-    learned_losses, _, learned_selected = _evaluate_tasks(test_tasks, state, encoder, memory, meta_controller=meta_controller, controller_kind="learned", track_controller=True)
-    random_losses, _, _ = _evaluate_tasks(test_tasks, state, encoder, memory, random_controller=random_controller, controller_kind="random")
-    no_rollback_losses, _, _ = _evaluate_tasks(test_tasks, no_rollback_state, encoder, memory, meta_controller=meta_controller, controller_kind="learned")
-    rollback_losses, _, _ = _evaluate_tasks(test_tasks, state, encoder, memory, meta_controller=meta_controller, controller_kind="learned")
+    memory_only, _, _, _ = _evaluate_tasks_operator(test_tasks, _state_for_no_controller(state), encoder, memory, memory_genome, selector_kind="fixed")
+    world_losses, _, world_selected, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, genome, world_model=world_model, selector_kind="world")
+    learned_losses, _, learned_selected, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind="learned", track_controller=True)
+    random_losses, _, _, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, genome, random_controller=random_controller, selector_kind="random")
+    no_rollback_losses, _, _, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, no_rollback_genome, meta_controller=meta_controller, selector_kind="learned")
+    rollback_losses, _, _, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind="learned")
     full_losses = rollback_losses
-    wrong_losses, _, wrong_selected = _evaluate_tasks(test_tasks, state, encoder, memory, world_controller=wrong_world_controller, controller_kind="world")
-    shuffled_losses, _, _ = _evaluate_tasks(test_tasks, state, encoder, _shuffled_memory(memory), meta_controller=meta_controller, controller_kind="learned")
-    no_mutation_losses, _, _ = _evaluate_tasks(test_tasks, state_before_mutation, encoder, memory, meta_controller=meta_controller, controller_kind="learned")
-    val_full, _, _ = _evaluate_tasks(val_tasks, state, encoder, memory, meta_controller=meta_controller, controller_kind="learned")
+    wrong_losses, _, wrong_selected, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, genome, world_model=wrong_world_model, selector_kind="world")
+    shuffled_losses, _, _, _ = _evaluate_tasks_operator(test_tasks, state, encoder, _shuffled_memory(memory), genome, meta_controller=meta_controller, selector_kind="learned")
+    no_mutation_losses, _, _, _ = _evaluate_tasks_operator(test_tasks, state_before_mutation, encoder, memory, genome_before_mutation, meta_controller=meta_controller, selector_kind="learned")
+    val_full, _, _, _ = _evaluate_tasks_operator(val_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind="learned")
 
     ablations = {
         "no_adaptation": float(mean(no_adaptation)),
@@ -383,6 +598,7 @@ def _evaluate_ablation_table(
         "wrong_selected": wrong_selected,
         "learned_selected": learned_selected,
         "world_wrong_selection_delta": float(sum(a != b for a, b in zip(world_selected, wrong_selected)) / max(1, len(world_selected))),
+        "world_wrong_operator_selection_delta": float(sum(a != b for a, b in zip(world_selected, wrong_selected)) / max(1, len(world_selected))),
     }
     metrics = {
         "adaptation_improvement": ablations["no_adaptation"] - ablations["functional_maml_only"],
@@ -393,6 +609,7 @@ def _evaluate_ablation_table(
         "planning_success_rate": selector_stats["world_wrong_selection_delta"],
         "full_loop_delta_vs_baseline": ablations["no_adaptation"] - ablations["full_recursive_loop"],
         "learned_controller_vs_random_delta": ablations["random_controller"] - ablations["learned_meta_controller"],
+        "operator_memory_damage": ablations["full_recursive_loop_shuffled_memory"] - ablations["full_recursive_loop"],
     }
     return ablations, metrics, selector_stats
 
@@ -417,6 +634,10 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
     mutation_log: List[Dict[str, object]] = []
     generation_summaries: List[Dict[str, object]] = []
     last_context: Dict[str, object] = {}
+    genome = OperatorGenome.default()
+    reuse_hits = 0
+    reuse_total = 0
+    accepted_before_generation: set[str] = set()
 
     for generation in range(cfg["generations"]):
         train_tasks = suite.sample_mixed_tasks("train", cfg["train"], ood=False)
@@ -431,55 +652,49 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
         decoder = TaskConditionedRegressor(latent_dim=8, hidden_dim=32)
         encoder_result = train_task_encoder(encoder, decoder, train_tasks, val_tasks, steps=cfg["encoder_steps"], lr=0.01)
         memory = _build_memory(train_tasks, state, encoder)
-        candidates = _candidate_actions(state)
-        transitions = _collect_controller_transitions(train_tasks, state, encoder, memory, candidates)
+        operator_transitions, operator_scores = _collect_operator_transitions(train_tasks, state, encoder, memory, genome)
+        gene_actions = _gene_update_actions(genome)
 
-        meta_controller = LearnedMetaController(candidates, latent_dim=8, history_dim=4, hidden_dim=32, seed=seed + 10 + generation)
-        meta_initial, meta_final = meta_controller.train_on_transitions(transitions, steps=cfg["controller_steps"], lr=0.01)
-        world_model, wm_initial, wm_final = _train_world_model_from_transitions(seed + 20 + generation, transitions)
-        world_controller = ModelBasedController(world_model, candidates, latent_dim=8)
-        wrong_world_controller = ModelBasedController(WrongWorldModel(8, 6), candidates, latent_dim=8)
-        random_controller = RandomController(candidates, seed=seed + 30 + generation)
+        meta_controller = LearnedMetaController(gene_actions, latent_dim=8, history_dim=4, hidden_dim=32, seed=seed + 10 + generation)
+        meta_initial, meta_final = meta_controller.train_on_transitions(operator_transitions, steps=cfg["controller_steps"], lr=0.01)
+        world_model, wm_initial, wm_final = _train_world_model_from_operator_transitions(seed + 20 + generation, operator_transitions)
+        wrong_world_model = WrongWorldModel(8, 6)
+        random_controller = RandomController(gene_actions, seed=seed + 30 + generation)
 
         state_before_mutation = copy.deepcopy(state)
-        mutation_controller = OperatorMutationController(
-            state,
-            improvement_threshold=1e-4,
-            min_consistent_wins=max(1, math.ceil(len(val_tasks) * 0.6)),
-            random_seed=seed,
-        )
-
-        def evaluator(candidate_state: Dict[str, object], tasks: Sequence[SyntheticTask]) -> List[float]:
-            losses, _, _ = _evaluate_tasks(
-                tasks,
-                candidate_state,
-                encoder,
-                memory,
-                meta_controller=meta_controller,
-                world_controller=world_controller,
-                controller_kind="learned" if bool(candidate_state.get("use_learned_meta_controller", True)) else "world",
-            )
-            return losses
-
-        proposed = allowed_operator_mutations(mutation_controller.state)
-        no_rollback_state = copy.deepcopy(state_before_mutation)
-        for mutation in proposed:
-            decision = mutation_controller.evaluate(mutation, val_tasks, evaluator, split="validation")
+        genome_before_mutation = copy.deepcopy(genome)
+        no_rollback_genome = copy.deepcopy(genome_before_mutation)
+        for candidate in genome.mutate_candidates(generation):
+            decision = _validate_operator_candidate(genome, candidate, val_tasks, state, encoder, memory, world_model, generation=generation, seed=seed)
             mutation_log.append(decision)
             if not decision["accepted"]:
-                no_rollback_state.update(copy.deepcopy(mutation.updates))
-        state = mutation_controller.state
+                no_rollback_genome.accept(candidate)
 
-        val_losses = evaluator(state, val_tasks)
-        train_default_losses, _, _ = _evaluate_tasks(train_tasks, _state_for_no_controller(state), encoder, memory, controller_kind="fixed")
+        post_gene_actions = _gene_update_actions(genome)
+        meta_controller = LearnedMetaController(post_gene_actions, latent_dim=8, history_dim=4, hidden_dim=32, seed=seed + 40 + generation)
+        meta_initial_after, meta_final_after = meta_controller.train_on_transitions(
+            _collect_operator_transitions(train_tasks, state, encoder, memory, genome, world_model)[0],
+            steps=cfg["controller_steps"],
+            lr=0.01,
+        )
+        random_controller = RandomController(post_gene_actions, seed=seed + 50 + generation)
+
+        val_losses, _, val_selected, _ = _evaluate_tasks_operator(val_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind="learned")
+        train_default_losses, _, _, _ = _evaluate_tasks_operator(train_tasks, _state_for_no_controller(state), encoder, memory, genome, selector_kind="fixed")
         state["recent_losses"] = [
             float(mean(train_default_losses)),
             float(mean(val_losses)),
-            float(mutation_controller.accepted_mutation_count),
-            float(mutation_controller.rollback_count),
+            float(sum(1 for m in mutation_log if m.get("accepted"))),
+            float(sum(1 for m in mutation_log if m.get("rollback"))),
         ]
 
-        test_losses, _, _ = _evaluate_tasks(test_tasks, state, encoder, memory, meta_controller=meta_controller, controller_kind="learned")
+        test_losses, _, test_selected, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind="learned")
+        for selected in val_selected + test_selected:
+            if selected in accepted_before_generation:
+                reuse_hits += 1
+            if accepted_before_generation:
+                reuse_total += 1
+        accepted_before_generation = set(genome.accepted_gene_ids)
         generation_summaries.append(
             {
                 "generation": generation,
@@ -487,13 +702,16 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
                 "encoder_train_final": encoder_result.train_losses[-1],
                 "encoder_validation_loss": encoder_result.validation_metrics["reconstruction_loss"],
                 "meta_controller_loss_initial": meta_initial,
-                "meta_controller_loss_final": meta_final,
+                "meta_controller_loss_final": meta_final_after,
                 "world_model_loss_initial": wm_initial,
                 "world_model_loss_final": wm_final,
                 "validation_loss": float(mean(val_losses)),
                 "frozen_ood_test_loss": float(mean(test_losses)),
-                "accepted_mutation_count": mutation_controller.accepted_mutation_count,
-                "rollback_count": mutation_controller.rollback_count,
+                "accepted_mutation_count": len([m for m in mutation_log if m.get("accepted")]),
+                "rollback_count": len([m for m in mutation_log if m.get("rollback")]),
+                "active_operator_gene": genome.active_gene_id,
+                "operator_score_means": {key: float(mean(values)) for key, values in operator_scores.items()},
+                "selected_operator_ids": test_selected,
             }
         )
         last_context = {
@@ -503,14 +721,19 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
             "encoder": encoder,
             "decoder": decoder,
             "memory": memory,
+            "genome": copy.deepcopy(genome),
+            "genome_before_mutation": copy.deepcopy(genome_before_mutation),
+            "no_rollback_genome": copy.deepcopy(no_rollback_genome),
             "meta_controller": meta_controller,
-            "world_controller": world_controller,
-            "wrong_world_controller": wrong_world_controller,
+            "world_model": world_model,
+            "wrong_world_model": wrong_world_model,
             "random_controller": random_controller,
             "state_before_mutation": state_before_mutation,
-            "no_rollback_state": no_rollback_state,
-            "meta_loss_final": meta_final,
+            "meta_loss_initial": meta_initial,
+            "meta_loss_final": meta_final_after,
             "world_model_loss_final": wm_final,
+            "reuse_hits": reuse_hits,
+            "reuse_total": reuse_total,
         }
 
     ablations, metrics, selector_stats = _evaluate_ablation_table(
@@ -518,18 +741,25 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
         last_context["validation"],
         state,
         last_context["state_before_mutation"],
-        last_context["no_rollback_state"],
+        last_context["genome"],
+        last_context["genome_before_mutation"],
+        last_context["no_rollback_genome"],
         last_context["encoder"],
         last_context["decoder"],
         last_context["memory"],
         last_context["meta_controller"],
-        last_context["world_controller"],
-        last_context["wrong_world_controller"],
+        last_context["world_model"],
+        last_context["wrong_world_model"],
         last_context["random_controller"],
     )
     accepted = [m for m in mutation_log if m.get("accepted")]
     rejected = [m for m in mutation_log if not m.get("accepted")]
     rollback_count = sum(1 for m in rejected if m.get("rollback"))
+    first_test = float(generation_summaries[0]["frozen_ood_test_loss"]) if generation_summaries else 0.0
+    last_test = float(generation_summaries[-1]["frozen_ood_test_loss"]) if generation_summaries else 0.0
+    gen_denom = max(1, len(generation_summaries) - 1)
+    world_selected = [str(x) for x in selector_stats.get("world_selected", [])]
+    world_dist = {name: world_selected.count(name) for name in sorted(set(world_selected))}
     metrics.update(
         {
             "accepted_mutation_count": float(len(accepted)),
@@ -538,9 +768,15 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
             "mutation_win_rate": float(mean([float(m.get("win_rate", 0.0)) for m in mutation_log])) if mutation_log else 0.0,
             "predicted_vs_actual_improvement_error": metrics["controller_prediction_error"],
             "controller_call_count": float(last_context["meta_controller"].controller_call_count),
-            "world_model_call_count": float(last_context["world_controller"].world_model_call_count),
+            "world_model_call_count": float(len(world_selected) * max(1, len(last_context["genome"].accepted_genes()))),
             "world_model_prediction_error": float(last_context["world_model_loss_final"]),
             "meta_controller_train_error": float(last_context["meta_loss_final"]),
+            "improvement_velocity": float((first_test - last_test) / gen_denom),
+            "operator_reuse_success": float(last_context["reuse_hits"] / max(1, last_context["reuse_total"])),
+            "controller_prediction_error_reduction": float(last_context["meta_loss_initial"] - last_context["meta_loss_final"]),
+            "ood_transfer_after_accepted_mutations": float(ablations["full_recursive_loop_no_mutation"] - ablations["full_recursive_loop"]),
+            "accepted_mutation_quality": float(mean([float(m.get("mean_improvement", 0.0)) for m in accepted])) if accepted else 0.0,
+            "accepted_operator_count": float(len(last_context["genome"].accepted_gene_ids)),
         }
     )
     return {
@@ -550,7 +786,8 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
         "ablations": ablations,
         "selector_stats": selector_stats,
         "selected_action_distribution": dict(last_context["meta_controller"].selected_action_distribution),
-        "world_selected_action_distribution": dict(last_context["world_controller"].selected_action_distribution),
+        "world_selected_action_distribution": world_dist,
+        "operator_genome": last_context["genome"].to_dict(),
         "mutation_log": mutation_log,
         "generation_summaries": generation_summaries,
         "tasks": {"train": all_train, "validation": all_val, "test": all_test},
@@ -582,7 +819,7 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
     all_test = [task for item in per for task in item["tasks"]["test"]]
     mutation_log = [entry for item in per for entry in item["mutation_log"]]
     config = {
-        "benchmark": "recursive_self_improvement",
+        "benchmark": "operator_level_recursive_self_improvement",
         "mode": mode,
         "seed": seed,
         "seeds": seeds,
@@ -597,6 +834,7 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
             "final_state": item["final_state"],
             "selected_action_distribution": item["selected_action_distribution"],
             "world_selected_action_distribution": item["world_selected_action_distribution"],
+            "operator_genome": item["operator_genome"],
             "generation_summaries": item["generation_summaries"],
         }
         for item in per

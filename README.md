@@ -1,6 +1,6 @@
 # DeepNeural-AutoExploration
 
-DeepNeural-AutoExploration is an **experimental, CPU-runnable research scaffold** for studying bounded closed-loop learning and recursive self-improvement mechanics. It is **not AGI**, not human-level intelligence, not a technological singularity system, and not a proof of true autonomous recursive self-improvement. The repository combines the original RSI-DNAX / functional MAML prototype with learned context inference, non-leaking episodic memory, learned controller-based update selection, executable validation-gated mutations, rollback, ablations, and manifests.
+DeepNeural-AutoExploration is an **experimental, CPU-runnable research scaffold** for studying bounded closed-loop learning and operator-level recursive self-improvement mechanics. It is **not AGI**, not human-level intelligence, not a technological singularity system, and not a proof of true autonomous recursive self-improvement. The repository combines the original RSI-DNAX / functional MAML prototype with learned context inference, non-leaking episodic memory, learned controller-based operator selection, executable validation-gated operator mutations, rollback, ablations, and manifests.
 
 ## What this repository currently supports
 
@@ -11,7 +11,7 @@ Supported claims:
 - It includes a bounded, similarity-based episodic memory that refuses records marked as containing query/test targets.
 - It includes procedural benchmarks beyond sinusoid regression and explicit anti-cheat tests.
 - It exposes AGI-relevant metrics such as adaptation improvement, OOD gap, world-model error, memory precision, planning success, rollback count, and validation-vs-test gap.
-- It can propose, validate, accept, reject, and roll back **bounded** self-improvement candidates under validation-only and anti-cheat constraints.
+- It can propose, validate, accept, reject, roll back, and reuse **bounded executable adaptation operators** under validation-only and anti-cheat constraints.
 
 Unsupported claims:
 
@@ -47,7 +47,9 @@ Unsupported claims:
 - `benchmarks/agi_scaffold_benchmark.py`
   - Quick/full benchmark entry point with JSON output and AGI-relevant aggregate metrics.
 - `benchmarks/recursive_self_improvement_benchmark.py`
-  - Smoke/quick/full recursive loop benchmark with train-only controller traces, validation-only mutation acceptance, frozen OOD test evaluation, ablations, JSON output, and manifest output.
+  - Smoke/quick/full recursive loop benchmark with train-only operator traces, validation-only operator mutation acceptance, frozen OOD test evaluation, ablations, JSON output, and manifest output.
+- `adaptation_operators.py`
+  - `OperatorGenome` and executable `AdaptationOperator` rules: functional MAML, Reptile-style update, memory-gated gradient scaling, and world-model-predicted learning-rate schedule.
 - `examples/closed_loop_demo.py`
   - Minimal inspectable demo of the full vertical slice.
 
@@ -59,12 +61,13 @@ The intended experimental loop is:
 observe task/context
 -> infer task embedding from support examples
 -> retrieve relevant episodic memories
--> adapt DeepNeuralAutoExplorer with functional MAML
+-> select an executable adaptation operator from the OperatorGenome
+-> adapt DeepNeuralAutoExplorer with functional MAML, Reptile-style update, memory-gated scaling, or world-model LR scheduling
 -> train/predict consequences with a latent WorldModel
 -> plan/select exploration action over latent states
 -> evaluate validation outcome
 -> store non-query-leaking memory
--> propose a self-improvement candidate
+-> propose an executable operator mutation
 -> validate candidate on validation tasks
 -> accept or reject with rollback
 ```
@@ -118,8 +121,10 @@ The repository includes tests and code paths intended to catch common benchmark 
 - Episodic memory rejects records marked as containing query targets.
 - Procedural benchmark functions must not return constant outputs.
 - OOD sampling must differ from the training distribution.
-- Self-improvement cannot accept a candidate without validation tasks.
+- Operator-level self-improvement cannot accept a candidate without validation tasks.
 - Rejected self-improvement candidates must roll back previous state.
+- Accepted operator mutations must alter runtime adaptation behavior, not only metadata.
+- A dead-code guard fails the recursive benchmark if all operators produce identical behavior.
 - Deterministic mode must be reproducible.
 - Stochastic exploration must vary outputs.
 - Planner tests fail if the world model is ignored.
@@ -219,17 +224,18 @@ The recursive benchmark loop is:
 sample train/validation/test task families
 -> infer support-only task context
 -> retrieve train-only non-leaking memory
--> collect train transition traces
--> train learned meta-controller and world model on allowed traces
--> evaluate executable mutation candidates on validation tasks only
+-> collect train traces from executable operator genes
+-> train learned meta-controller and world model on allowed operator traces
+-> evaluate executable operator mutation candidates on validation tasks only
 -> accept statistically consistent validation improvements
 -> roll back rejected mutations
+-> reuse accepted operator genes in later generations
 -> freeze accepted state
 -> evaluate held-out OOD test tasks
 -> write JSON result and anti-cheat manifest
 ```
 
-The benchmark reports ablations for no adaptation, functional MAML, learned task encoder only, memory-conditioned adaptation, world-model controller, learned meta-controller, random/fixed/wrong controllers, self-improvement with and without rollback, full recursive loop, wrong-world-model full loop, shuffled-memory full loop, and no-mutation full loop.
+The benchmark reports ablations for no adaptation, functional MAML, learned task encoder only, memory-conditioned adaptation, world-model controller, learned meta-controller, random/fixed/wrong controllers, self-improvement with and without rollback, full recursive loop, wrong-world-model full loop, shuffled-memory full loop, and no-mutation full loop. Operator-level metrics include improvement velocity, operator reuse success, controller prediction error reduction across generations, OOD transfer after accepted mutations, accepted mutation quality, accepted operator count, and dead-code detection.
 
 ## Minimal usage example
 
@@ -254,7 +260,7 @@ Current limitations:
 - Task inference is feature-based rather than a learned amortized inference network.
 - The world model is small and trained on synthetic dynamics only.
 - Planning is exhaustive short-horizon search, not scalable model-predictive control.
-- Self-improvement candidates are bounded and executable, but still limited to small hyperparameter, controller, memory, objective, exploration schedule, and small architecture-width changes.
+- Self-improvement candidates are bounded and executable, but still limited to small adaptation-operator mutations and CPU-sized procedural tasks.
 - Metrics are scaffold diagnostics, not evidence of general intelligence.
 - The recursive benchmark tests controlled mechanics and leakage resistance; it does not demonstrate open-ended self-improvement.
 
@@ -264,7 +270,7 @@ Recommended next upgrades:
 2. Couple world-model uncertainty to exploration action selection.
 3. Add held-out compositional task families and longer-horizon nonstationary sequence tasks.
 4. Make self-improvement candidates include architecture/operator mutations with stricter statistical tests.
-5. Add persistent experiment manifests that cryptographically record train/validation/test task IDs and seeds.
+5. Add richer operator-genome search spaces while preserving validation-only acceptance and manifest checks.
 
 ## License
 
@@ -296,20 +302,16 @@ This upgrade moves the repository further toward an **AGI-oriented prototype** a
 - Relevant memory can improve adaptation; corrupted or irrelevant memory is tested to avoid treating insertion order or arbitrary logs as transfer.
 - `EpisodicMemory` continues to reject records marked as containing query targets and enforces bounded capacity.
 
-### Controlled operator mutation
+### Executable operator genome
 
-- `operator_mutation.py` adds controlled mutation candidates beyond tiny scalar tweaks:
-  - inner learning-rate scale changes
-  - inner-step changes
-  - exploration policy switches
-  - memory retrieval `k` changes
-  - learned-vs-hand-crafted encoder selection metadata
-  - task-encoder on/off metadata
-  - planner horizon changes
-  - first-order vs second-order MAML metadata
-  - residual width multiplier metadata for small models
-  - uncertainty and intrinsic objective weighting coefficients
-- `OperatorMutationController` snapshots executable state, evaluates candidates only on validation tasks, accepts only consistent improvements above threshold, rolls back rejected candidates, and preserves accepted/rejected mutation logs. Mutation updates affect runtime behavior such as inner-loop learning rate, inner steps, memory retrieval `k`, learned encoder use, memory conditioning, world-model controller use, planner horizon, objective weights, exploration noise schedule, and small compatible width-multiplier model variants.
+- `adaptation_operators.py` adds `OperatorGenome`, `OperatorGene`, and executable `AdaptationOperator` rules.
+- Current operators are:
+  - functional MAML inner-loop adaptation
+  - Reptile-style support update and interpolation
+  - memory-gated gradient scaling using non-test episodic rewards
+  - world-model-predicted learning-rate scheduling
+- The recursive benchmark mutates operator genes, evaluates candidates only on validation tasks, accepts only consistent improvements above threshold, rolls back rejected operator genes, and reuses accepted operators in later generations.
+- `operator_mutation.py` remains available for bounded config-level mutation experiments, but the recursive benchmark now exercises executable operator-level mutations.
 - Final test tasks are forbidden for mutation acceptance.
 
 ### Experiment manifests and anti-cheat checks
@@ -342,7 +344,7 @@ python benchmarks/recursive_self_improvement_benchmark.py --mode quick --seed 42
 python benchmarks/recursive_self_improvement_benchmark.py --mode full --seed 42
 ```
 
-Supported claim for this benchmark: the system can run a bounded recursive loop that trains controllers on allowed traces, evaluates executable mutation candidates on validation splits, accepts or rejects them with a small statistical rule, rolls back failures, freezes accepted state, evaluates held-out OOD test tasks, and records JSON/manifests with anti-cheat checks. Unsupported claim: autonomous open-ended recursive self-improvement.
+Supported claim for this benchmark: the system can run a bounded operator-level recursive loop that trains controllers on allowed traces, evaluates executable adaptation-operator candidates on validation splits, accepts or rejects them with a small statistical rule, rolls back failures, reuses accepted operators, freezes accepted state, evaluates held-out OOD test tasks, and records JSON/manifests with anti-cheat checks. Unsupported claim: autonomous open-ended recursive self-improvement.
 
 ### Next demo command
 
@@ -374,7 +376,7 @@ Supported claims:
 - It includes model-based update selection using a learned world model.
 - It includes memory-conditioned adaptation.
 - It includes controlled operator mutation with validation-gated self-improvement candidates.
-- It includes a bounded recursive loop where accepted mutation candidates change runtime behavior instead of only metadata.
+- It includes a bounded recursive loop where accepted operator mutations change runtime adaptation behavior instead of only metadata.
 - It includes manifests and anti-cheat tests intended to expose leakage and ablation failures.
 
 Unsupported claims:
@@ -391,7 +393,7 @@ Unsupported claims:
 
 - The learned task encoder is small and trained with a reconstruction proxy, not a broad task-language or multimodal objective.
 - The world model predicts compact latent improvement proxies rather than rich environment dynamics.
-- Operator mutations are metadata/config-level and small-model-safe; they are not unconstrained architecture search.
+- Operator mutations are executable but bounded; they are not unconstrained architecture search or open-ended code synthesis.
 - Benchmarks are CPU-sized and procedural, so they test mechanics and leakage resistance rather than broad real-world intelligence.
 - Memory transfer is similarity/reward conditioned and can still be brittle under large distribution shifts.
 

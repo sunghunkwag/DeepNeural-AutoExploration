@@ -88,6 +88,10 @@ def test_recursive_benchmark_writes_json_manifest_and_anticheat(tmp_path):
     manifest = json.loads(manifest_path.read_text())
     assert result["aggregate"]["controller_call_count"]["mean"] > 0
     assert result["aggregate"]["world_model_call_count"]["mean"] > 0
+    assert "improvement_velocity" in result["aggregate"]
+    assert "operator_reuse_success" in result["aggregate"]
+    assert "accepted_mutation_quality" in result["aggregate"]
+    assert result["aggregate"]["accepted_operator_count"]["mean"] >= 4
     assert payload["task_ids"]["train"] and payload["task_ids"]["validation"] and payload["task_ids"]["test"]
     assert manifest["seed_list"] == [31]
     assert manifest["accepted_mutations"] or manifest["rejected_mutations"]
@@ -95,12 +99,13 @@ def test_recursive_benchmark_writes_json_manifest_and_anticheat(tmp_path):
     assert manifest["metric_summary"]["aggregate"]
     assert "no query_y stored in memory" in payload["anti_cheat_checks_passed"]
     assert "no test task used in mutation acceptance" in manifest["anti_cheat_checks_passed"]
+    assert payload["per_seed"][0]["operator_genome"]["accepted_gene_ids"]
 
 
 def test_recursive_smoke_is_deterministic_for_same_seed(tmp_path):
     first = run("smoke", 32, str(tmp_path / "first.json"))
     second = run("smoke", 32, str(tmp_path / "second.json"))
-    for key in ["full_loop_delta_vs_baseline", "controller_prediction_error", "accepted_mutation_count", "rollback_count"]:
+    for key in ["full_loop_delta_vs_baseline", "controller_prediction_error", "accepted_mutation_count", "rollback_count", "operator_reuse_success"]:
         assert first["aggregate"][key]["mean"] == pytest.approx(second["aggregate"][key]["mean"], rel=0, abs=1e-7)
     assert first["task_ids"] == second["task_ids"]
 
