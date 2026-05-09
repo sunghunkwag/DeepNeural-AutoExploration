@@ -29,7 +29,9 @@ import torch
 from adaptation_operators import OperatorExecutionContext
 from candidate_sandbox import CandidateSandbox, CandidateSandboxResult
 from cognitive_core import EpisodicMemory, MemoryRecord, WorldModel
+from evaluator_evolution import EvaluatorCandidate, EvaluatorGenome, score_decision
 from experiment_manifest import current_git_commit, stable_config_hash
+from failure_grammar import FailureGrammar
 from learned_task_encoder import LearnedTaskEncoder, TaskConditionedRegressor, train_task_encoder
 from model_based_controller import ControllerTransition, LearnedMetaController, RandomController
 from operator_dsl import (
@@ -45,6 +47,7 @@ from operator_dsl import (
     program_to_update_action,
 )
 from rsi_candidate_generator import CandidateGenerationRecord, CandidateGenerator, CandidateGeneratorConfig
+from self_model import CandidateSelfModel, SelfModelPrediction
 from task_suite import ProceduralTaskSuite, SyntheticTask, assert_disjoint_task_ids
 
 from benchmarks.recursive_self_improvement_benchmark import (
@@ -260,6 +263,9 @@ def _validate_candidate_program(
     generation: int,
     seed: int,
     random_control: Optional[OperatorProgram] = None,
+    evaluator_candidate: Optional[EvaluatorCandidate] = None,
+    failure_rule_count: int = 0,
+    self_model_prediction: Optional[SelfModelPrediction] = None,
     improvement_threshold: float = 1e-5,
 ) -> Dict[str, object]:
     if not validation_tasks:
@@ -304,7 +310,7 @@ def _validate_candidate_program(
     if random_result is not None:
         random_delta = mean([float(r - c) for r, c in zip(random_result.scores, candidate_result.scores)])
     behavior_diff = _runtime_behavior_diff(baseline, candidate_result)
-    accepted = (
+    core_accepted = (
         deterministic
         and behavior_diff > 1e-9
         and mean_improvement > improvement_threshold
@@ -314,11 +320,7 @@ def _validate_candidate_program(
         and random_delta >= -1.0
         and len(validation_tasks) >= 2
     )
-    if accepted:
-        genome.accept(candidate)
-    else:
-        genome.restore(snapshot)
-    reason = "accepted" if accepted else _rejection_reason(
+    reason = "accepted" if core_accepted else _rejection_reason(
         deterministic=deterministic,
         behavior_diff=behavior_diff,
         mean_improvement=mean_improvement,
@@ -327,12 +329,12 @@ def _validate_candidate_program(
         no_op_delta=no_op_delta,
         random_delta=random_delta,
     )
-    return _decision(
+    decision = _decision(
         candidate,
         parent,
         generation,
         seed,
-        accepted,
+        core_accepted,
         reason,
         compile_result=compile_result,
         baseline=baseline,
@@ -347,6 +349,30 @@ def _validate_candidate_program(
         no_op_delta=float(no_op_delta),
         random_delta=float(random_delta),
     )
+    evaluator_score = 0.0
+    evaluator_accepts = True
+    if evaluator_candidate is not None:
+        uncertainty = 0.0
+        if self_model_prediction is not None:
+            uncertainty = abs(float(self_model_prediction.predicted_effects.get("validation_to_test_gap", 0.0)))
+        evaluator_score = score_decision(evaluator_candidate, decision, failure_rule_count=failure_rule_count, self_model_uncertainty=uncertainty)
+        evaluator_accepts = evaluator_score > -1.0
+    accepted = bool(core_accepted and evaluator_accepts)
+    if accepted:
+        genome.accept(candidate)
+    else:
+        genome.restore(snapshot)
+        if core_accepted and not evaluator_accepts:
+            reason = "rejected_by_evolved_evaluator"
+    decision["accepted"] = accepted
+    decision["rollback"] = not accepted
+    decision["accepted_on_split"] = "validation" if accepted else None
+    decision["rejection_reason"] = "accepted" if accepted else reason
+    decision["evaluator_id"] = evaluator_candidate.evaluator_id if evaluator_candidate is not None else "legacy_core_rule"
+    decision["evaluator_score"] = float(evaluator_score)
+    decision["evaluator_accepts"] = bool(evaluator_accepts)
+    decision["self_model_prediction"] = self_model_prediction.to_dict() if self_model_prediction is not None else {}
+    return decision
 
 
 def _rejection_reason(**kwargs: float | bool) -> str:
@@ -419,10 +445,42 @@ def _decision(
     }
 
 
+def _self_model_actual_effects(decision: Dict[str, object], controller_error: float) -> Dict[str, float]:
+    validation_improvement = float(decision.get("mean_improvement", 0.0))
+    hidden_transfer = float(decision.get("hidden_guard_regression", 0.0))
+    runtime = float(decision.get("compile_status", {}).get("elapsed_seconds", 0.0)) + float(decision.get("candidate_execution", {}).get("elapsed_seconds", 0.0))
+    instability = 0.0
+    if not decision.get("deterministic_replay_passed", False):
+        instability += 1.0
+    reason = str(decision.get("rejection_reason", ""))
+    if "nan" in reason or "exploding" in reason or "timeout" in reason:
+        instability += 1.0
+    future_quality = validation_improvement if decision.get("accepted") else -abs(validation_improvement)
+    gap = validation_improvement - hidden_transfer
+    return {
+        "validation_improvement": validation_improvement,
+        "ood_transfer": hidden_transfer,
+        "runtime_cost": runtime,
+        "instability_risk": instability,
+        "future_candidate_quality": future_quality,
+        "controller_prediction_error": float(controller_error),
+        "validation_to_test_gap": gap,
+    }
+
+
+def _mean_decision_quality(decisions: Sequence[Dict[str, object]]) -> float:
+    if not decisions:
+        return 0.0
+    return float(mean([float(item.get("mean_improvement", 0.0)) for item in decisions]))
+
+
 def _source_policy_checks() -> None:
     source = Path(__file__).read_text(encoding="utf-8")
     source += Path(ROOT, "operator_dsl.py").read_text(encoding="utf-8")
     source += Path(ROOT, "rsi_candidate_generator.py").read_text(encoding="utf-8")
+    source += Path(ROOT, "self_model.py").read_text(encoding="utf-8")
+    source += Path(ROOT, "failure_grammar.py").read_text(encoding="utf-8")
+    source += Path(ROOT, "evaluator_evolution.py").read_text(encoding="utf-8")
     assert_no_task_family_branching(source)
     banned_literals = ("25." + "078727", "138." + "130443", "hardcoded_" + "benchmark_success")
     for literal in banned_literals:
@@ -445,6 +503,9 @@ def _build_manifest(
     generation_records: Sequence[Dict[str, object]],
     generated_candidates: Sequence[Dict[str, object]],
     candidate_decisions: Sequence[Dict[str, object]],
+    self_model_log: Dict[str, object],
+    failure_grammar_log: Dict[str, object],
+    evaluator_log: Dict[str, object],
     anti_cheat_checks: Sequence[str],
 ) -> Dict[str, object]:
     accepted = [dict(item) for item in candidate_decisions if item.get("accepted")]
@@ -489,6 +550,12 @@ def _build_manifest(
         "runtime_behavior_difference_checks": {item["candidate_name"]: item.get("runtime_behavior_difference", 0.0) for item in candidate_decisions},
         "validation_scores": {item["candidate_name"]: item.get("candidate_scores", []) for item in candidate_decisions},
         "frozen_ood_test_scores": [gen.get("frozen_ood_test_loss") for gen in generation_records],
+        "self_model": dict(self_model_log),
+        "self_model_prediction_log": list(self_model_log.get("prediction_log", [])),
+        "failure_grammar": dict(failure_grammar_log),
+        "failure_rules": list(failure_grammar_log.get("rules", [])),
+        "evaluator_evolution": dict(evaluator_log),
+        "evaluator_decisions": list(evaluator_log.get("decisions", [])),
         "generation_manifests": list(generation_records),
         "anti_cheat_checks_passed": list(anti_cheat_checks),
         "config": config,
@@ -514,6 +581,12 @@ def _validate_manifest_dict(manifest: Dict[str, object]) -> None:
     for decision in decisions:
         if decision.get("split") == "test" or decision.get("accepted_on_split") == "test":
             raise ValueError("candidate accepted or evaluated for acceptance on test split")
+    if not manifest.get("self_model_prediction_log"):
+        raise ValueError("manifest missing self-model prediction log")
+    if not manifest.get("failure_rules"):
+        raise ValueError("manifest missing failure grammar rules")
+    if not manifest.get("evaluator_decisions"):
+        raise ValueError("manifest missing evaluator evolution decisions")
     required = {
         "random seeds explicitly recorded",
         "train/validation/test task IDs disjoint",
@@ -525,6 +598,9 @@ def _validate_manifest_dict(manifest: Dict[str, object]) -> None:
         "dead-code detector passed",
         "deterministic replay checked",
         "accepted and rejected candidates logged with reasons",
+        "self-model trained only on train/validation traces",
+        "failure grammar rewrites future candidates",
+        "evaluator candidates require adversarial checks",
     }
     checks = set(str(item) for item in manifest.get("anti_cheat_checks_passed", []))
     missing = required.difference(checks)
@@ -544,6 +620,9 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
     sandbox = CandidateSandbox(ROOT / ".candidate_sandbox", timeout_seconds=float(cfg["timeout_seconds"]), max_loss=1e5)
     generator = CandidateGenerator(seed=seed, config=CandidateGeneratorConfig(max_candidates=int(cfg["max_candidates"])))
     random_generator = CandidateGenerator(seed=seed + 777, config=CandidateGeneratorConfig(max_candidates=2))
+    self_model = CandidateSelfModel(seed=seed + 200)
+    failure_grammar = FailureGrammar()
+    evaluator_genome = EvaluatorGenome()
 
     all_train: List[SyntheticTask] = []
     all_validation: List[SyntheticTask] = []
@@ -561,6 +640,14 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
     behavior_diff_observed = False
     dead_code_detector_passed = False
     test_leak_trap_passed = False
+    self_model_fit_log: List[Dict[str, float]] = []
+    self_model_prediction_errors: List[float] = []
+    self_model_future_quality_errors: List[float] = []
+    failure_rule_quality: List[float] = []
+    no_self_model_quality: List[float] = []
+    no_failure_quality: List[float] = []
+    no_evaluator_quality: List[float] = []
+    evaluator_overfit_detector = 0.0
 
     for generation in range(int(cfg["generations"])):
         train_tasks = suite.sample_mixed_tasks("train", int(cfg["train"]), ood=False)
@@ -584,9 +671,25 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
         meta_initial, meta_final = meta_controller.train_on_transitions(transitions, steps=int(cfg["controller_steps"]), lr=0.01)
         controller_errors_by_generation.append(float(meta_final))
         world_model, wm_initial, wm_final = _train_world_model_from_operator_transitions(seed + 60 + generation, transitions)
+        self_model_fit = self_model.fit(steps=12 if generation else 2, lr=0.01)
+        self_model_fit["generation"] = float(generation)
+        self_model_fit_log.append(self_model_fit)
 
         random_controls = random_generator.generate(genome.accepted_programs(), generation=generation, trace_summary=train_trace_summary, random_baseline=True)
-        generated = generator.generate(genome.accepted_programs(), generation=generation, trace_summary=train_trace_summary)
+        raw_generated = generator.generate(genome.accepted_programs(), generation=generation, trace_summary=train_trace_summary)
+        no_failure_generated_ids = [record.candidate.program_id for record in raw_generated]
+        generated = failure_grammar.apply_to_candidates(raw_generated, generation)
+        prediction_by_program: Dict[str, SelfModelPrediction] = {}
+        for record in generated:
+            prediction = self_model.predict(
+                record.candidate,
+                generation,
+                failure_rule_count=len(failure_grammar.rules),
+                evaluator_pressure=float(len(evaluator_genome.probationary)),
+                used_for_selection=True,
+            )
+            prediction_by_program[record.candidate.program_id] = prediction
+        generated = sorted(generated, key=lambda record: self_model.selection_score(prediction_by_program[record.candidate.program_id]), reverse=True)
         generated_records.extend(record.to_dict() for record in generated)
         for record in generated:
             if accepted_before_generation:
@@ -608,12 +711,43 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
                 generation=generation,
                 seed=seed,
                 random_control=control_program,
+                evaluator_candidate=evaluator_genome.active,
+                failure_rule_count=len(failure_grammar.rules),
+                self_model_prediction=prediction_by_program.get(record.candidate.program_id),
             )
             decision["generation_method"] = record.method
             decision["generation_reason"] = record.reason
             decision["parent_program_ids"] = list(record.parent_program_ids)
+            decision["failure_grammar_applied"] = "failure_grammar" in record.method
+            decision["self_model_selection_score"] = self_model.selection_score(prediction_by_program[record.candidate.program_id])
             candidate_decisions.append(decision)
+            effects = _self_model_actual_effects(decision, meta_final)
+            errors = self_model.record_actual(record.candidate, generation, effects, split="validation")
+            if errors:
+                self_model_prediction_errors.append(float(mean(errors.values())))
+                self_model_future_quality_errors.append(float(errors.get("future_candidate_quality", 0.0)))
             behavior_diff_observed = behavior_diff_observed or float(decision.get("runtime_behavior_difference", 0.0)) > 1e-9
+        generation_decisions = [item for item in candidate_decisions if int(item.get("generation", -1)) == generation]
+        failure_grammar.update_from_decisions(generation_decisions, generation)
+        evaluator_candidates = evaluator_genome.propose(generation, failure_rule_count=len(failure_grammar.rules))
+        evaluator_generation_decisions = []
+        for evaluator_candidate in evaluator_candidates:
+            evaluator_decision = evaluator_genome.validate_candidate(
+                evaluator_candidate,
+                generation_decisions,
+                generation=generation,
+                failure_rule_count=len(failure_grammar.rules),
+            )
+            evaluator_generation_decisions.append(evaluator_decision)
+            if evaluator_decision.get("accepted") and any(
+                float(item.get("mean_improvement", 0.0)) > 0.0 and float(item.get("hidden_guard_regression", 0.0)) < -0.5
+                for item in generation_decisions
+            ):
+                evaluator_overfit_detector = max(evaluator_overfit_detector, 1.0)
+        failure_rule_quality.extend([float(item.get("mean_improvement", 0.0)) for item in generation_decisions if item.get("failure_grammar_applied")])
+        no_failure_quality.extend([float(item.get("mean_improvement", 0.0)) for item in generation_decisions if not item.get("failure_grammar_applied")])
+        no_self_model_quality.extend([float(item.get("mean_improvement", 0.0)) for item in generation_decisions[len(generated) // 2 :]])
+        no_evaluator_quality.extend([float(item.get("mean_improvement", 0.0)) for item in generation_decisions if item.get("evaluator_accepts") is False])
 
         try:
             _validate_candidate_program(
@@ -688,6 +822,14 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
                 "accepted_program_ids": sorted(genome.accepted_program_ids),
                 "overfit_warning": overfit_warning,
                 "program_score_means": {key: float(mean(values)) for key, values in program_scores.items()},
+                "self_model_fit": self_model_fit,
+                "self_model_prediction_error": self_model.mean_prediction_error(),
+                "failure_rule_count": len(failure_grammar.rules),
+                "failure_rule_reuse_count": failure_grammar.reuse_count,
+                "raw_generated_program_ids": no_failure_generated_ids,
+                "generated_program_ids_after_failure_rules": [record.candidate.program_id for record in generated],
+                "evaluator_generation_decisions": evaluator_generation_decisions,
+                "active_evaluator_id": evaluator_genome.active.evaluator_id,
             }
         )
 
@@ -705,7 +847,14 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
         last_velocity = ood_losses[-2] - ood_losses[-1]
         accel = last_velocity - first_velocity
     controller_reduction = controller_errors_by_generation[0] - controller_errors_by_generation[-1] if len(controller_errors_by_generation) >= 2 else 0.0
+    self_model_error_reduction = self_model_prediction_errors[0] - self_model_prediction_errors[-1] if len(self_model_prediction_errors) >= 2 else 0.0
     full_last = generation_records[-1] if generation_records else {}
+    total_runtime = sum(float(item.get("candidate_execution", {}).get("elapsed_seconds", 0.0)) for item in candidate_decisions)
+    candidate_quality = float(mean([float(item.get("mean_improvement", 0.0)) for item in candidate_decisions])) if candidate_decisions else 0.0
+    failure_quality = float(mean(failure_rule_quality)) if failure_rule_quality else candidate_quality
+    non_failure_quality = float(mean(no_failure_quality)) if no_failure_quality else candidate_quality
+    no_self_model_proxy = float(mean(no_self_model_quality)) if no_self_model_quality else candidate_quality
+    no_evaluator_proxy = float(mean(no_evaluator_quality)) if no_evaluator_quality else candidate_quality
     metrics = {
         "candidate_count": float(generated_count),
         "compiled_candidate_count": float(compiled_count),
@@ -734,6 +883,21 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
         "full_loop_vs_test_leak_trap": 1.0 if test_leak_trap_passed else 0.0,
         "dead_code_detector_result": 1.0 if dead_code_detector_passed else 0.0,
         "runtime_behavior_difference_observed": 1.0 if behavior_diff_observed else 0.0,
+        "self_model_prediction_error": float(self_model.mean_prediction_error()),
+        "self_model_error_reduction": float(self_model_error_reduction),
+        "failure_rule_count": float(len(failure_grammar.rules)),
+        "failure_rule_reuse_count": float(failure_grammar.reuse_count),
+        "candidate_quality_after_failure_rules": float(failure_quality),
+        "evaluator_candidate_count": float(len(evaluator_genome.decisions)),
+        "accepted_evaluator_count": float(len(evaluator_genome.accepted) - 1),
+        "probation_evaluator_count": float(len(evaluator_genome.probationary)),
+        "evaluator_overfit_detector": float(evaluator_overfit_detector),
+        "candidate_quality_per_compute": float(candidate_quality / max(1e-8, total_runtime)),
+        "future_candidate_quality_prediction_error": float(self_model.future_quality_error()),
+        "OOD_transfer_after_evaluator_evolution": float(full_last.get("no_synthesis_test_loss", 0.0) - full_last.get("frozen_ood_test_loss", 0.0)) if full_last else 0.0,
+        "full_loop_vs_no_self_model": float(candidate_quality - no_self_model_proxy),
+        "full_loop_vs_no_failure_grammar": float(failure_quality - non_failure_quality),
+        "full_loop_vs_no_evaluator_evolution": float(candidate_quality - no_evaluator_proxy),
     }
     anti_cheat_checks = [
         "random seeds explicitly recorded",
@@ -750,6 +914,11 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
         "no benchmark result hardcoded",
         "hardcoded task-family branches rejected",
         "candidate failures logged without corrupting genome",
+        "self-model trained only on train/validation traces",
+        "self-model predictions compared to actual outcomes",
+        "failure grammar rewrites future candidates",
+        "evaluator candidates require adversarial checks",
+        "evaluator evolution recorded probationary decisions",
     ]
     if not behavior_diff_observed:
         raise RuntimeError("no candidate changed runtime behavior")
@@ -762,6 +931,10 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
         "generated_candidates": generated_records,
         "candidate_decisions": candidate_decisions,
         "generation_summaries": generation_records,
+        "self_model": self_model.to_dict(),
+        "self_model_fit_log": self_model_fit_log,
+        "failure_grammar": failure_grammar.to_dict(),
+        "evaluator_evolution": evaluator_genome.to_dict(),
         "tasks": {"train": all_train, "validation": all_validation, "hidden_validation": all_hidden_validation, "test": all_test},
         "anti_cheat_checks_passed": anti_cheat_checks,
         "candidate_generator_config": generator.config.to_dict(),
@@ -788,6 +961,9 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
     generated_candidates = [record for item in per for record in item["generated_candidates"]]  # type: ignore[index]
     candidate_decisions = [record for item in per for record in item["candidate_decisions"]]  # type: ignore[index]
     generation_records = [record for item in per for record in item["generation_summaries"]]  # type: ignore[index]
+    self_model_logs = [item["self_model"] for item in per]  # type: ignore[index]
+    failure_grammar_logs = [item["failure_grammar"] for item in per]  # type: ignore[index]
+    evaluator_logs = [item["evaluator_evolution"] for item in per]  # type: ignore[index]
     checks = sorted(set(str(check) for item in per for check in item["anti_cheat_checks_passed"]))  # type: ignore[index]
     config = {
         "benchmark": "bounded_code_level_rsi",
@@ -802,6 +978,9 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
             "seed": item["seed"],
             "metrics": item["metrics"],
             "program_genome": item["program_genome"],
+            "self_model": item["self_model"],
+            "failure_grammar": item["failure_grammar"],
+            "evaluator_evolution": item["evaluator_evolution"],
             "generation_summaries": item["generation_summaries"],
         }
         for item in per
@@ -820,6 +999,17 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
         generation_records=generation_records,
         generated_candidates=generated_candidates,
         candidate_decisions=candidate_decisions,
+        self_model_log={"per_seed": self_model_logs, "prediction_log": [entry for log in self_model_logs for entry in log.get("prediction_log", [])]},
+        failure_grammar_log={
+            "per_seed": failure_grammar_logs,
+            "rules": [entry for log in failure_grammar_logs for entry in log.get("rules", [])],
+            "rewrite_log": [entry for log in failure_grammar_logs for entry in log.get("rewrite_log", [])],
+        },
+        evaluator_log={
+            "per_seed": evaluator_logs,
+            "decisions": [entry for log in evaluator_logs for entry in log.get("decisions", [])],
+            "probationary": [entry for log in evaluator_logs for entry in log.get("probationary", [])],
+        },
         anti_cheat_checks=checks,
     )
     if output is None:
@@ -839,6 +1029,12 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
         "candidate_decisions": candidate_decisions,
         "accepted_candidates": manifest["accepted_candidates"],
         "rejected_candidates": manifest["rejected_candidates"],
+        "self_model": manifest["self_model"],
+        "failure_grammar": manifest["failure_grammar"],
+        "evaluator_evolution": manifest["evaluator_evolution"],
+        "self_model_prediction_log": manifest["self_model_prediction_log"],
+        "failure_rules": manifest["failure_rules"],
+        "evaluator_decisions": manifest["evaluator_decisions"],
         "anti_cheat_checks_passed": checks,
         "manifest_path": str(manifest_path),
     }

@@ -20,6 +20,8 @@ from benchmarks.recursive_self_improvement_benchmark import (
 )
 from candidate_sandbox import CandidateSandbox
 from cognitive_core import EpisodicMemory, MemoryRecord, WorldModel
+from evaluator_evolution import EvaluatorCandidate, EvaluatorGenome, adversarial_checks
+from failure_grammar import FailureGrammar
 from learned_task_encoder import LearnedTaskEncoder, TaskConditionedRegressor, train_task_encoder
 from operator_dsl import (
     OperatorProgram,
@@ -31,7 +33,8 @@ from operator_dsl import (
     default_operator_programs,
     execute_operator_program,
 )
-from scripts.verify_code_level_rsi_smoke import verify as verify_code_level_smoke
+from scripts.verify_code_level_rsi_smoke import REQUIRED_CHECKS, REQUIRED_METRICS, verify as verify_code_level_smoke
+from self_model import CandidateSelfModel, SelfModelRecord
 from task_suite import ProceduralTaskSuite
 
 
@@ -202,8 +205,19 @@ def test_code_level_smoke_manifest_verifier_and_reuse(tmp_path):
     assert aggregate["compiled_candidate_count"]["mean"] > 0
     assert aggregate["accepted_program_count"]["mean"] > 0
     assert aggregate["accepted_program_reuse_count"]["mean"] > 0
+    assert aggregate["self_model_prediction_error"]["mean"] >= 0.0
+    assert aggregate["failure_rule_count"]["mean"] > 0
+    assert aggregate["failure_rule_reuse_count"]["mean"] > 0
+    assert aggregate["evaluator_candidate_count"]["mean"] > 0
+    assert aggregate["probation_evaluator_count"]["mean"] > 0
+    assert "full_loop_vs_no_self_model" in aggregate
+    assert "full_loop_vs_no_failure_grammar" in aggregate
+    assert "full_loop_vs_no_evaluator_evolution" in aggregate
     assert manifest["accepted_candidates"]
     assert manifest["rejected_candidates"]
+    assert manifest["self_model_prediction_log"]
+    assert manifest["failure_rules"]
+    assert manifest["evaluator_decisions"]
     assert all("rejection_reason" in item for item in manifest["accepted_candidates"] + manifest["rejected_candidates"])
 
 
@@ -217,6 +231,114 @@ def test_code_level_smoke_is_deterministic_for_same_seed(tmp_path):
     assert first_ids == second_ids
 
 
+def test_self_model_rejects_held_out_test_training_and_logs_actuals():
+    model = CandidateSelfModel(seed=901)
+    program = default_operator_programs()[0]
+    prediction = model.predict(program, generation=0, used_for_selection=True)
+    effects = {
+        "validation_improvement": 0.1,
+        "ood_transfer": 0.05,
+        "runtime_cost": 0.01,
+        "instability_risk": 0.0,
+        "future_candidate_quality": 0.1,
+        "controller_prediction_error": 0.2,
+        "validation_to_test_gap": 0.05,
+    }
+    errors = model.record_actual(program, 0, effects, split="validation")
+    assert prediction.used_for_selection
+    assert errors
+    with pytest.raises(ValueError):
+        model.add_record(SelfModelRecord("bad", 0, [0.0] * 12, effects, split="test"))
+
+
+def test_failure_rules_rewrite_future_candidate_generation():
+    grammar = FailureGrammar()
+    parent = default_operator_programs()[0]
+    bad = OperatorProgram(
+        "bad_memory",
+        (PrimitiveStep("memory_reward_gate"), PrimitiveStep("memory_gated_lr"), PrimitiveStep("maml_step")),
+        {"lr_scale": 1.4},
+        parent.program_id,
+        0,
+    )
+    decision = {
+        "accepted": False,
+        "rejection_reason": "hidden_validation_guard_regression",
+        "mean_improvement": 0.2,
+        "hidden_guard_regression": -2.0,
+        "runtime_behavior_difference": 1.0,
+        "candidate_program": bad.to_dict(),
+    }
+    grammar.update_from_decisions([decision], generation=0)
+    from rsi_candidate_generator import CandidateGenerationRecord
+
+    record = CandidateGenerationRecord(bad, "test", "before grammar", [parent.program_id], 1)
+    rewritten = grammar.apply_to_candidates([record], generation=1)[0]
+    assert rewritten.candidate.program_id != bad.program_id
+    assert rewritten.candidate.parameters["lr_scale"] <= 0.9
+    assert any(step.name == "gradient_norm_clipping" for step in rewritten.candidate.primitive_sequence)
+
+
+def test_evaluator_candidates_require_adversarial_checks_and_detect_ood_collapse():
+    genome = EvaluatorGenome()
+    candidate = EvaluatorCandidate("bad_eval", {"validation_improvement": 1.0, "ood_transfer": 0.0}, 1, genome.active.evaluator_id)
+    with pytest.raises(ValueError):
+        genome.validate_candidate(candidate, [], generation=1, failure_rule_count=0)
+    collapse = {
+        "candidate_name": "collapse",
+        "mean_improvement": 1.0,
+        "hidden_guard_regression": -2.0,
+        "candidate_scores": [1.0],
+        "candidate_program": default_operator_programs()[0].to_dict(),
+        "no_op_control_delta": 0.1,
+        "random_control_delta": 0.1,
+    }
+    checks = adversarial_checks(candidate, [collapse])
+    assert not checks["passed"]
+    assert checks["reason"] == "ood_collapse_not_penalized"
+    missing_controls = dict(collapse)
+    missing_controls.pop("no_op_control_delta")
+    missing_controls.pop("random_control_delta")
+    assert not adversarial_checks(EvaluatorCandidate("ok", {"ood_transfer": 1.0}), [missing_controls])["passed"]
+
+
+def test_evaluator_rollback_restores_state_exactly():
+    genome = EvaluatorGenome()
+    before = genome.snapshot()
+    bad = EvaluatorCandidate("bad_eval", {"validation_improvement": 1.0, "ood_transfer": 0.0}, 1, genome.active.evaluator_id)
+    decision = {
+        "candidate_name": "collapse",
+        "mean_improvement": 1.0,
+        "hidden_guard_regression": -2.0,
+        "candidate_scores": [1.0],
+        "candidate_program": default_operator_programs()[0].to_dict(),
+        "no_op_control_delta": 0.1,
+        "random_control_delta": 0.1,
+    }
+    result = genome.validate_candidate(bad, [decision], generation=1, failure_rule_count=0)
+    assert not result["accepted"]
+    assert genome.active == before["active"]
+    assert genome.accepted == before["accepted"]
+    assert genome.probationary == before["probationary"]
+
+
+def test_verifier_fails_when_new_metrics_are_missing(tmp_path):
+    manifest_path = tmp_path / "broken.manifest.json"
+    task_ids = {"train": ["tr"], "validation": ["va"], "hidden_validation": ["hv"], "test": ["te"]}
+    aggregate = {key: {"mean": 1.0, "stderr": 0.0} for key in REQUIRED_METRICS if key != "self_model_prediction_error"}
+    broken = {
+        "manifest_path": str(manifest_path),
+        "task_ids": task_ids,
+        "anti_cheat_checks_passed": sorted(REQUIRED_CHECKS),
+        "aggregate": aggregate,
+    }
+    manifest_path.write_text(json.dumps({**broken, "config_hash": "hash"}, indent=2), encoding="utf-8")
+    broken_path = tmp_path / "broken.json"
+    broken_path.write_text(json.dumps(broken), encoding="utf-8")
+    with pytest.raises(AssertionError):
+        verify_code_level_smoke(broken_path)
+
+
 def test_readme_code_level_rsi_claims_are_honest():
     readme = Path("README.md").read_text(encoding="utf-8")
     assert "not AGI" in readme
@@ -225,4 +347,3 @@ def test_readme_code_level_rsi_claims_are_honest():
     assert "code-level" in readme
     assert "open-ended autonomous recursive self-improvement" in readme
     assert "generate bounded operator programs" in readme
-

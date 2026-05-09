@@ -16,6 +16,21 @@ REQUIRED_METRICS = {
     "validation_to_test_gap",
     "dead_code_detector_result",
     "runtime_behavior_difference_observed",
+    "self_model_prediction_error",
+    "self_model_error_reduction",
+    "failure_rule_count",
+    "failure_rule_reuse_count",
+    "candidate_quality_after_failure_rules",
+    "evaluator_candidate_count",
+    "accepted_evaluator_count",
+    "probation_evaluator_count",
+    "evaluator_overfit_detector",
+    "candidate_quality_per_compute",
+    "future_candidate_quality_prediction_error",
+    "OOD_transfer_after_evaluator_evolution",
+    "full_loop_vs_no_self_model",
+    "full_loop_vs_no_failure_grammar",
+    "full_loop_vs_no_evaluator_evolution",
 }
 
 REQUIRED_CHECKS = {
@@ -29,6 +44,11 @@ REQUIRED_CHECKS = {
     "dead-code detector passed",
     "deterministic replay checked",
     "accepted and rejected candidates logged with reasons",
+    "self-model trained only on train/validation traces",
+    "self-model predictions compared to actual outcomes",
+    "failure grammar rewrites future candidates",
+    "evaluator candidates require adversarial checks",
+    "evaluator evolution recorded probationary decisions",
 }
 
 
@@ -86,6 +106,14 @@ def verify(result_path: str | Path) -> None:
         raise AssertionError("dead-code detector did not pass")
     if aggregate["runtime_behavior_difference_observed"]["mean"] < 1.0:
         raise AssertionError("no runtime behavior difference observed")
+    if aggregate["failure_rule_count"]["mean"] <= 0:
+        raise AssertionError("failure grammar did not produce rules")
+    if aggregate["failure_rule_reuse_count"]["mean"] <= 0:
+        raise AssertionError("failure grammar rules were not reused")
+    if aggregate["evaluator_candidate_count"]["mean"] <= 0:
+        raise AssertionError("no evaluator candidates were evaluated")
+    if aggregate["probation_evaluator_count"]["mean"] <= 0:
+        raise AssertionError("no evaluator reached probation")
 
     generated = result.get("generated_candidates") or []
     if not generated:
@@ -111,6 +139,24 @@ def verify(result_path: str | Path) -> None:
         raise AssertionError("manifest missing runtime behavior checks")
     if not manifest.get("operator_source_hashes"):
         raise AssertionError("manifest missing operator source/program hashes")
+    if not result.get("self_model_prediction_log") or not manifest.get("self_model_prediction_log"):
+        raise AssertionError("self-model prediction logs missing")
+    if not result.get("failure_rules") or not manifest.get("failure_rules"):
+        raise AssertionError("failure grammar rules missing")
+    if not result.get("evaluator_decisions") or not manifest.get("evaluator_decisions"):
+        raise AssertionError("evaluator evolution decisions missing")
+    if not manifest.get("failure_grammar", {}).get("rewrite_log"):
+        raise AssertionError("failure grammar did not rewrite future candidates")
+    for entry in manifest.get("self_model_prediction_log", []):
+        if entry.get("actual_effects") is None:
+            raise AssertionError("self-model prediction missing actual outcome comparison")
+    for decision in manifest.get("evaluator_decisions", []):
+        checks = decision.get("adversarial_checks", {})
+        if not checks.get("passed"):
+            continue
+        for key in ("checked_against_old_evaluator", "hidden_validation_pool", "wrong_world_model_control", "shuffled_memory_control", "no_op_candidate_control", "random_candidate_control"):
+            if not checks.get(key):
+                raise AssertionError(f"evaluator decision missing adversarial check: {key}")
 
 
 def main() -> None:

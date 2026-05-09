@@ -1,6 +1,6 @@
 # DeepNeural-AutoExploration
 
-DeepNeural-AutoExploration is an **experimental, CPU-runnable research scaffold** for studying bounded closed-loop learning and code-level/operator-program recursive self-improvement mechanics. It is **not AGI**, not human-level intelligence, not a technological singularity system, and not a proof of true autonomous or open-ended recursive self-improvement. The repository combines the original RSI-DNAX / functional MAML prototype with learned context inference, non-leaking episodic memory, learned controller-based operator selection, executable validation-gated operator mutations, a bounded operator-program DSL, sandboxed candidate evaluation, rollback, ablations, and manifests.
+DeepNeural-AutoExploration is an **experimental, CPU-runnable research scaffold** for studying bounded closed-loop learning and code-level/operator-program recursive self-improvement mechanics. It is **not AGI**, not human-level intelligence, not a technological singularity system, and not a proof of true autonomous or open-ended recursive self-improvement. The repository combines the original RSI-DNAX / functional MAML prototype with learned context inference, non-leaking episodic memory, learned controller-based operator selection, executable validation-gated operator mutations, a bounded operator-program DSL, sandboxed candidate evaluation, a candidate-effect self-model, reusable failure grammar, probationary evaluator evolution, rollback, ablations, and manifests.
 
 ## What this repository currently supports
 
@@ -12,6 +12,7 @@ Supported claims:
 - It includes procedural benchmarks beyond sinusoid regression and explicit anti-cheat tests.
 - It exposes AGI-relevant metrics such as adaptation improvement, OOD gap, world-model error, memory precision, planning success, rollback count, and validation-vs-test gap.
 - It can generate bounded operator programs, validate them, accept robust improvements, reject/roll back failures, reuse accepted candidates, and record manifests under validation-only and anti-cheat constraints.
+- It can learn a bounded self-model over validation-only candidate outcomes, compress failures into future-generation rewrite rules, and evolve acceptance evaluators only after adversarial checks.
 
 Unsupported claims:
 
@@ -57,8 +58,14 @@ Unsupported claims:
   - Deterministic candidate generation through parent mutation, recombination, parameter perturbation, primitive insertion/deletion/replacement, schedule mutation, memory-gate mutation, and world-model-gate mutation.
 - `candidate_sandbox.py`
   - Isolated local candidate compilation/evaluation with timeout, exception capture, NaN/inf rejection, exploding-loss rejection, and serialized candidate evidence.
+- `self_model.py`
+  - A small CPU-runnable model that predicts candidate effects on validation improvement, hidden-validation transfer proxy, runtime cost, instability risk, future candidate quality, controller prediction error, and validation-to-test proxy gap using allowed train/validation evidence only.
+- `failure_grammar.py`
+  - Compresses rejected candidates into reusable rules such as validation-only overfit, OOD-collapse proxy, memory-gate brittleness, wrong-world-model sensitivity, no behavior difference, exploding/NaN loss, deterministic replay failure, dead-code candidate, and high-validation-gain poor-transfer.
+- `evaluator_evolution.py`
+  - Evolves bounded evaluator candidates for OOD-transfer penalty, validation-to-test gap penalty, runtime cost penalty, instability penalty, novelty bonus, failure-rule penalty, and self-model uncertainty penalty under probation and adversarial checks.
 - `benchmarks/code_level_rsi_benchmark.py`
-  - Smoke/quick/full benchmark for bounded code-level RSI mechanics using synthesized operator programs, validation-only acceptance, frozen OOD test evaluation, reuse tracking, and manifests.
+  - Smoke/quick/full benchmark for bounded code-level RSI mechanics using synthesized operator programs, validation-only acceptance, self-model-guided candidate ranking, failure-grammar candidate rewriting, probationary evaluator evolution, frozen OOD test evaluation, reuse tracking, and manifests.
 - `examples/closed_loop_demo.py`
   - Minimal inspectable demo of the full vertical slice.
 
@@ -78,8 +85,11 @@ observe task/context
 -> store non-query-leaking memory
 -> propose an executable operator mutation
 -> synthesize bounded operator-program candidates from the DSL
+-> rank candidates with a train/validation-only self-model
+-> rewrite candidates with reusable failure-grammar rules
 -> compile and sandbox candidate programs
 -> validate candidate on validation tasks
+-> evolve probationary evaluator candidates under adversarial checks
 -> accept or reject with rollback
 ```
 
@@ -139,6 +149,9 @@ The repository includes tests and code paths intended to catch common benchmark 
 - Candidate programs are evaluated for acceptance only on validation and hidden-control validation pools, never on held-out test tasks.
 - Candidate failures, NaN/inf losses, exploding losses, deterministic replay failures, and missing runtime differences are rejected and logged.
 - Accepted operator programs must be reusable by later generations.
+- Self-model records marked as held-out test split are rejected.
+- Failure-grammar rules must alter future generated candidates to count as active.
+- Evaluator candidates cannot affect acceptance unless they pass checks against old evaluator behavior, hidden validation, wrong-world-model control, shuffled-memory control, no-op control, and random control.
 - A dead-code guard fails the recursive benchmark if all operators produce identical behavior.
 - Deterministic mode must be reproducible.
 - Stochastic exploration must vary outputs.
@@ -159,7 +172,7 @@ pip install pytest
 
 ```bash
 pytest -q
-# Expected after this upgrade: 67 passed
+# Expected after this upgrade: 72 passed
 ```
 
 ## Running the original sinusoid benchmark
@@ -292,7 +305,9 @@ initialize accepted operator programs
 
 The code-level benchmark reports candidate count, compile count, failed compile count, validation rejected count, accepted program count, rollback count, accepted program reuse count, improvement velocity, improvement acceleration, mutation quality, candidate survival rate, validation-to-test gap, OOD transfer after accepted programs, controller prediction error, controller prediction error reduction across generations, world-model prediction error, world-model selection effect, memory-gate effect, wrong-world-model degradation, shuffled-memory degradation, full loop versus no synthesis, full loop versus fixed operators, full loop versus random candidate generator, full loop versus no rollback, test-leak trap status, and dead-code detector status.
 
-Supported claim for this benchmark: the system can generate bounded operator programs, compile and execute them, validate them under sandboxed validation-only controls, reject/roll back failures, accept robust improvements, reuse accepted candidates, evaluate frozen accepted programs on held-out OOD tests, and write audit manifests. Unsupported claim: broad intelligence or autonomous open-ended recursive self-improvement.
+The next-layer metrics include self-model prediction error, self-model error reduction, failure-rule count, failure-rule reuse count, candidate quality after failure rules, evaluator candidate count, accepted evaluator count, probation evaluator count, evaluator overfit detector, candidate quality per compute, future candidate quality prediction error, OOD transfer after evaluator evolution, full loop versus no self-model, full loop versus no failure grammar, and full loop versus no evaluator evolution.
+
+Supported claim for this benchmark: the system can generate bounded operator programs, compile and execute them, rank them with a train/validation-only self-model, rewrite them using compressed failure rules, validate them under sandboxed validation-only controls, evolve probationary evaluators under adversarial checks, reject/roll back failures, accept robust improvements, reuse accepted candidates, evaluate frozen accepted programs on held-out OOD tests, and write audit manifests. Unsupported claim: broad intelligence or autonomous open-ended recursive self-improvement.
 
 ## Minimal usage example
 
@@ -318,6 +333,7 @@ Current limitations:
 - The world model is small and trained on synthetic dynamics only.
 - Planning is exhaustive short-horizon search, not scalable model-predictive control.
 - Self-improvement candidates are bounded and executable, but still limited to a small DSL of adaptation-operator programs and CPU-sized procedural tasks.
+- The self-model and evaluator evolution are small supervised/probationary components trained from benchmark traces, not general self-understanding or autonomous research ability.
 - Metrics are scaffold diagnostics, not evidence of general intelligence.
 - The recursive benchmark tests controlled mechanics and leakage resistance; it does not demonstrate open-ended self-improvement.
 
@@ -378,6 +394,13 @@ This upgrade moves the repository further toward an **AGI-oriented prototype** a
 - `rsi_candidate_generator.py` mutates and recombines accepted programs without using held-out test results.
 - `candidate_sandbox.py` evaluates generated programs in isolated temporary candidate directories and rejects exceptions, timeouts, NaN/inf losses, exploding losses, deterministic replay failures, and candidates that do not change runtime behavior.
 - `benchmarks/code_level_rsi_benchmark.py` evaluates whether accepted generated programs are reused across later generations and whether later generations improve candidate discovery speed or quality.
+
+### Self-model, failure grammar, and evaluator evolution
+
+- `self_model.py` predicts bounded candidate effects from validation-allowed records and logs predicted-versus-actual effects per generation.
+- `failure_grammar.py` turns rejected candidates into rewrite rules that modify future generated candidates.
+- `evaluator_evolution.py` mutates evaluator scoring rules, keeps accepted evaluator candidates probationary, and rejects evaluators that fail adversarial checks.
+- These mechanisms are part of the benchmark execution path, but remain bounded and audit-oriented. They do not make the system open-ended or autonomous.
 
 ### Experiment manifests and anti-cheat checks
 
