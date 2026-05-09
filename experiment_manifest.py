@@ -58,6 +58,8 @@ def _family(task: object) -> str:
 
 
 def _ood(task: object) -> bool:
+    if isinstance(task, dict) and "ood" in task:
+        return bool(task.get("ood"))
     meta = task.get("metadata", {}) if isinstance(task, dict) else getattr(task, "metadata", {})
     return bool(meta.get("ood", False)) if isinstance(meta, dict) else False
 

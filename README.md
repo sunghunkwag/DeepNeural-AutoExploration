@@ -1,6 +1,6 @@
 # DeepNeural-AutoExploration
 
-DeepNeural-AutoExploration is now an **experimental AGI-oriented scaffold** for CPU-runnable closed-loop learning experiments. It is **not finished AGI**, not human-level intelligence, and not a proof of autonomous recursive self-improvement. The repository combines the original RSI-DNAX / functional MAML prototype with a new cognitive loop that can infer task context, adapt quickly, store episodic summaries, learn latent transition dynamics, plan over those dynamics, score intrinsic objectives, and validate or roll back controlled self-improvement proposals.
+DeepNeural-AutoExploration is an **experimental, CPU-runnable research scaffold** for studying bounded closed-loop learning and recursive self-improvement mechanics. It is **not AGI**, not human-level intelligence, not a technological singularity system, and not a proof of true autonomous recursive self-improvement. The repository combines the original RSI-DNAX / functional MAML prototype with learned context inference, non-leaking episodic memory, learned controller-based update selection, executable validation-gated mutations, rollback, ablations, and manifests.
 
 ## What this repository currently supports
 
@@ -11,12 +11,14 @@ Supported claims:
 - It includes a bounded, similarity-based episodic memory that refuses records marked as containing query/test targets.
 - It includes procedural benchmarks beyond sinusoid regression and explicit anti-cheat tests.
 - It exposes AGI-relevant metrics such as adaptation improvement, OOD gap, world-model error, memory precision, planning success, rollback count, and validation-vs-test gap.
+- It can propose, validate, accept, reject, and roll back **bounded** self-improvement candidates under validation-only and anti-cheat constraints.
 
 Unsupported claims:
 
 - This is not AGI.
 - This does not demonstrate human-level intelligence.
 - This does not prove true recursive self-improvement.
+- This does not demonstrate autonomous open-ended recursive self-improvement.
 - This is not a technological singularity system.
 - This is not claimed to be state-of-the-art.
 
@@ -44,6 +46,8 @@ Unsupported claims:
   - Helpers for task-ID disjointness and non-constant function checks.
 - `benchmarks/agi_scaffold_benchmark.py`
   - Quick/full benchmark entry point with JSON output and AGI-relevant aggregate metrics.
+- `benchmarks/recursive_self_improvement_benchmark.py`
+  - Smoke/quick/full recursive loop benchmark with train-only controller traces, validation-only mutation acceptance, frozen OOD test evaluation, ablations, JSON output, and manifest output.
 - `examples/closed_loop_demo.py`
   - Minimal inspectable demo of the full vertical slice.
 
@@ -135,7 +139,7 @@ pip install pytest
 
 ```bash
 pytest -q
-# Expected after this upgrade: 33 passed
+# Expected after this upgrade: 47 passed
 ```
 
 ## Running the original sinusoid benchmark
@@ -189,6 +193,44 @@ The new benchmark reports more than final MSE:
 - baseline-to-adapted test delta
 - seed variance in full mode through standard error
 
+## Running the bounded recursive self-improvement benchmark
+
+Smoke mode is intended for fast CPU sanity checks:
+
+```bash
+python benchmarks/recursive_self_improvement_benchmark.py --mode smoke --seed 42
+```
+
+Quick and full modes increase seeds, generations, and task counts:
+
+```bash
+python benchmarks/recursive_self_improvement_benchmark.py --mode quick --seed 42
+python benchmarks/recursive_self_improvement_benchmark.py --mode full --seed 42
+```
+
+By default, results are written to:
+
+- `results/recursive_self_improvement_<mode>_seed<seed>.json`
+- `results/recursive_self_improvement_<mode>_seed<seed>.manifest.json`
+
+The recursive benchmark loop is:
+
+```text
+sample train/validation/test task families
+-> infer support-only task context
+-> retrieve train-only non-leaking memory
+-> collect train transition traces
+-> train learned meta-controller and world model on allowed traces
+-> evaluate executable mutation candidates on validation tasks only
+-> accept statistically consistent validation improvements
+-> roll back rejected mutations
+-> freeze accepted state
+-> evaluate held-out OOD test tasks
+-> write JSON result and anti-cheat manifest
+```
+
+The benchmark reports ablations for no adaptation, functional MAML, learned task encoder only, memory-conditioned adaptation, world-model controller, learned meta-controller, random/fixed/wrong controllers, self-improvement with and without rollback, full recursive loop, wrong-world-model full loop, shuffled-memory full loop, and no-mutation full loop.
+
 ## Minimal usage example
 
 ```python
@@ -212,8 +254,9 @@ Current limitations:
 - Task inference is feature-based rather than a learned amortized inference network.
 - The world model is small and trained on synthetic dynamics only.
 - Planning is exhaustive short-horizon search, not scalable model-predictive control.
-- Self-improvement currently modifies a small hyperparameter/operator state rather than synthesizing new architectures.
+- Self-improvement candidates are bounded and executable, but still limited to small hyperparameter, controller, memory, objective, exploration schedule, and small architecture-width changes.
 - Metrics are scaffold diagnostics, not evidence of general intelligence.
+- The recursive benchmark tests controlled mechanics and leakage resistance; it does not demonstrate open-ended self-improvement.
 
 Recommended next upgrades:
 
@@ -266,7 +309,7 @@ This upgrade moves the repository further toward an **AGI-oriented prototype** a
   - first-order vs second-order MAML metadata
   - residual width multiplier metadata for small models
   - uncertainty and intrinsic objective weighting coefficients
-- `OperatorMutationController` snapshots state, evaluates candidates only on validation tasks, accepts only consistent improvements above threshold, rolls back rejected candidates, and preserves accepted/rejected mutation logs.
+- `OperatorMutationController` snapshots executable state, evaluates candidates only on validation tasks, accepts only consistent improvements above threshold, rolls back rejected candidates, and preserves accepted/rejected mutation logs. Mutation updates affect runtime behavior such as inner-loop learning rate, inner steps, memory retrieval `k`, learned encoder use, memory conditioning, world-model controller use, planner horizon, objective weights, exploration noise schedule, and small compatible width-multiplier model variants.
 - Final test tasks are forbidden for mutation acceptance.
 
 ### Experiment manifests and anti-cheat checks
@@ -290,6 +333,16 @@ Modes:
 - `full`: five seeds with mean, standard error, per-seed results, JSON output, and manifest output.
 
 Required ablations in the next benchmark include no adaptation, functional MAML only, MAML plus learned task encoder, MAML plus memory, MAML plus world-model controller, full loop, full loop without self-improvement, full loop with shuffled memory, and full loop with wrong world model.
+
+### Recursive benchmark commands
+
+```bash
+python benchmarks/recursive_self_improvement_benchmark.py --mode smoke --seed 42
+python benchmarks/recursive_self_improvement_benchmark.py --mode quick --seed 42
+python benchmarks/recursive_self_improvement_benchmark.py --mode full --seed 42
+```
+
+Supported claim for this benchmark: the system can run a bounded recursive loop that trains controllers on allowed traces, evaluates executable mutation candidates on validation splits, accepts or rejects them with a small statistical rule, rolls back failures, freezes accepted state, evaluates held-out OOD test tasks, and records JSON/manifests with anti-cheat checks. Unsupported claim: autonomous open-ended recursive self-improvement.
 
 ### Next demo command
 
@@ -321,6 +374,7 @@ Supported claims:
 - It includes model-based update selection using a learned world model.
 - It includes memory-conditioned adaptation.
 - It includes controlled operator mutation with validation-gated self-improvement candidates.
+- It includes a bounded recursive loop where accepted mutation candidates change runtime behavior instead of only metadata.
 - It includes manifests and anti-cheat tests intended to expose leakage and ablation failures.
 
 Unsupported claims:
@@ -329,6 +383,7 @@ Unsupported claims:
 - This does not prove general intelligence.
 - This does not demonstrate human-level intelligence.
 - This does not achieve true recursive self-improvement.
+- This does not demonstrate autonomous open-ended recursive self-improvement.
 - This is not a singularity system.
 - This is not claimed to be state of the art.
 
