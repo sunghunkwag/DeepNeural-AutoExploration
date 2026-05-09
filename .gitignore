@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+.candidate_sandbox/
 *.py[codz]
 *$py.class
 

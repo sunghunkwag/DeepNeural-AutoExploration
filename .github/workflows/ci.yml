@@ -35,6 +35,13 @@ jobs:
           python benchmarks/recursive_self_improvement_benchmark.py --mode smoke --seed 42 --output "$SMOKE_JSON"
           python scripts/verify_recursive_smoke.py "$SMOKE_JSON"
 
+      - name: Run code-level RSI smoke benchmark
+        env:
+          CODE_RSI_JSON: ${{ runner.temp }}/code_level_rsi_smoke_seed42.json
+        run: |
+          python benchmarks/code_level_rsi_benchmark.py --mode smoke --seed 42 --output "$CODE_RSI_JSON"
+          python scripts/verify_code_level_rsi_smoke.py "$CODE_RSI_JSON"
+
       - name: Upload recursive smoke outputs
         uses: actions/upload-artifact@v4
         with:
@@ -42,3 +49,5 @@ jobs:
           path: |
             ${{ runner.temp }}/recursive_self_improvement_smoke_seed42.json
             ${{ runner.temp }}/recursive_self_improvement_smoke_seed42.manifest.json
+            ${{ runner.temp }}/code_level_rsi_smoke_seed42.json
+            ${{ runner.temp }}/code_level_rsi_smoke_seed42.manifest.json
