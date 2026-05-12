@@ -1,0 +1,340 @@
+{
+  "anti_cheat_check_results": {
+    "controls_executed": true,
+    "corrupted_visual_label_control_exercised": true,
+    "delayed_background_result_penalized": true,
+    "deterministic_replay_passed": true,
+    "expected_action_labels_absent": true,
+    "missing_background_result_penalized": true,
+    "non_monotonic_timestamps_rejected": true,
+    "shuffled_timestamps_rejected": true
+  },
+  "bad_control_residue_counts": {
+    "always_interrupt": 6,
+    "always_silence": 7,
+    "no_op": 7,
+    "random": 8
+  },
+  "config": {
+    "micro_turn_ms": 200,
+    "mode": "smoke",
+    "policy_count": 8,
+    "seed": 42,
+    "seeds": [
+      42
+    ],
+    "task_family_names": [
+      "adversarial_controls",
+      "background_delegation",
+      "mixed_stream",
+      "proactive_visual_event",
+      "turn_taking"
+    ]
+  },
+  "control_policy_scores": {
+    "ablated_no_background": 0.5344444444444445,
+    "ablated_no_visual": 0.84,
+    "always_interrupt": 0.4955555555555555,
+    "always_listen": 0.4044444444444445,
+    "always_silence": 0.4044444444444445,
+    "baseline": 1.0,
+    "no_op": 0.4044444444444445,
+    "random": 0.45333333333333337
+  },
+  "manifest_path": "results\\interaction_residue_smoke_seed42.manifest.json",
+  "metrics": {
+    "always_interrupt_control_score": 0.4955555555555555,
+    "always_silence_control_score": 0.4044444444444445,
+    "backchannel_overuse_count": 0,
+    "background_delivery_rate": 1.0,
+    "bad_interrupt_count": 0,
+    "deterministic_replay_passed": true,
+    "idle_when_questioned_count": 0,
+    "interaction_quality": 1.0,
+    "late_background_result_count": 0,
+    "missed_visual_change_count": 0,
+    "no_op_control_score": 0.4044444444444445,
+    "premature_answer_count": 0,
+    "random_control_score": 0.45333333333333337,
+    "residue_count": 0,
+    "total_residue_severity": 0.0
+  },
+  "mode": "smoke",
+  "per_seed": [
+    {
+      "anti_cheat_check_results": {
+        "controls_executed": true,
+        "corrupted_visual_label_control_exercised": true,
+        "delayed_background_result_penalized": true,
+        "deterministic_replay_passed": true,
+        "expected_action_labels_absent": true,
+        "missing_background_result_penalized": true,
+        "non_monotonic_timestamps_rejected": true,
+        "shuffled_timestamps_rejected": true
+      },
+      "bad_control_residue_counts": {
+        "always_interrupt": 6,
+        "always_silence": 7,
+        "no_op": 7,
+        "random": 8
+      },
+      "control_policy_scores": {
+        "ablated_no_background": 0.5344444444444445,
+        "ablated_no_visual": 0.84,
+        "always_interrupt": 0.4955555555555555,
+        "always_listen": 0.4044444444444445,
+        "always_silence": 0.4044444444444445,
+        "baseline": 1.0,
+        "no_op": 0.4044444444444445,
+        "random": 0.45333333333333337
+      },
+      "event_timestamps": [
+        0,
+        200,
+        1400,
+        2600,
+        3000,
+        3800,
+        4000,
+        4200,
+        4600,
+        5000,
+        6200
+      ],
+      "metrics": {
+        "action_count": 11,
+        "always_interrupt_control_score": 0.4955555555555555,
+        "always_silence_control_score": 0.4044444444444445,
+        "backchannel_overuse_count": 0,
+        "background_delivery_rate": 1.0,
+        "bad_interrupt_count": 0,
+        "deterministic_replay_passed": true,
+        "event_count": 11,
+        "failure_counts": {},
+        "idle_when_questioned_count": 0,
+        "interaction_quality": 1.0,
+        "late_background_result_count": 0,
+        "missed_visual_change_count": 0,
+        "no_op_control_score": 0.4044444444444445,
+        "premature_answer_count": 0,
+        "random_control_score": 0.45333333333333337,
+        "residue_count": 0,
+        "total_residue_severity": 0.0
+      },
+      "number_of_actions": 11,
+      "number_of_events": 11,
+      "number_of_residues": 0,
+      "policy_results": {
+        "ablated_no_background": {
+          "metrics": {
+            "action_count": 9,
+            "backchannel_overuse_count": 0,
+            "background_delivery_rate": 0.0,
+            "bad_interrupt_count": 0,
+            "event_count": 9,
+            "failure_counts": {
+              "late_background_result": 3,
+              "premature_answer": 2
+            },
+            "idle_when_questioned_count": 0,
+            "interaction_quality": 0.5344444444444445,
+            "late_background_result_count": 3,
+            "missed_visual_change_count": 0,
+            "premature_answer_count": 2,
+            "residue_count": 5,
+            "total_residue_severity": 4.1899999999999995
+          },
+          "policy_name": "ablated_no_background",
+          "residue_count": 5
+        },
+        "ablated_no_visual": {
+          "metrics": {
+            "action_count": 11,
+            "backchannel_overuse_count": 0,
+            "background_delivery_rate": 1.0,
+            "bad_interrupt_count": 0,
+            "event_count": 11,
+            "failure_counts": {
+              "missed_visual_change": 2
+            },
+            "idle_when_questioned_count": 0,
+            "interaction_quality": 0.84,
+            "late_background_result_count": 0,
+            "missed_visual_change_count": 2,
+            "premature_answer_count": 0,
+            "residue_count": 2,
+            "total_residue_severity": 1.76
+          },
+          "policy_name": "ablated_no_visual",
+          "residue_count": 2
+        },
+        "always_interrupt": {
+          "metrics": {
+            "action_count": 9,
+            "backchannel_overuse_count": 0,
+            "background_delivery_rate": 0.0,
+            "bad_interrupt_count": 1,
+            "event_count": 9,
+            "failure_counts": {
+              "bad_interrupt": 1,
+              "idle_when_questioned": 2,
+              "late_background_result": 3
+            },
+            "idle_when_questioned_count": 2,
+            "interaction_quality": 0.4955555555555555,
+            "late_background_result_count": 3,
+            "missed_visual_change_count": 0,
+            "premature_answer_count": 0,
+            "residue_count": 6,
+            "total_residue_severity": 4.54
+          },
+          "policy_name": "always_interrupt",
+          "residue_count": 6
+        },
+        "always_listen": {
+          "metrics": {
+            "action_count": 9,
+            "backchannel_overuse_count": 0,
+            "background_delivery_rate": 0.0,
+            "bad_interrupt_count": 0,
+            "event_count": 9,
+            "failure_counts": {
+              "idle_when_questioned": 2,
+              "late_background_result": 3,
+              "missed_visual_change": 2
+            },
+            "idle_when_questioned_count": 2,
+            "interaction_quality": 0.4044444444444445,
+            "late_background_result_count": 3,
+            "missed_visual_change_count": 2,
+            "premature_answer_count": 0,
+            "residue_count": 7,
+            "total_residue_severity": 5.359999999999999
+          },
+          "policy_name": "always_listen",
+          "residue_count": 7
+        },
+        "always_silence": {
+          "metrics": {
+            "action_count": 9,
+            "backchannel_overuse_count": 0,
+            "background_delivery_rate": 0.0,
+            "bad_interrupt_count": 0,
+            "event_count": 9,
+            "failure_counts": {
+              "idle_when_questioned": 2,
+              "late_background_result": 3,
+              "missed_visual_change": 2
+            },
+            "idle_when_questioned_count": 2,
+            "interaction_quality": 0.4044444444444445,
+            "late_background_result_count": 3,
+            "missed_visual_change_count": 2,
+            "premature_answer_count": 0,
+            "residue_count": 7,
+            "total_residue_severity": 5.359999999999999
+          },
+          "policy_name": "always_silence",
+          "residue_count": 7
+        },
+        "baseline": {
+          "metrics": {
+            "action_count": 11,
+            "backchannel_overuse_count": 0,
+            "background_delivery_rate": 1.0,
+            "bad_interrupt_count": 0,
+            "event_count": 11,
+            "failure_counts": {},
+            "idle_when_questioned_count": 0,
+            "interaction_quality": 1.0,
+            "late_background_result_count": 0,
+            "missed_visual_change_count": 0,
+            "premature_answer_count": 0,
+            "residue_count": 0,
+            "total_residue_severity": 0.0
+          },
+          "policy_name": "baseline",
+          "residue_count": 0
+        },
+        "no_op": {
+          "metrics": {
+            "action_count": 9,
+            "backchannel_overuse_count": 0,
+            "background_delivery_rate": 0.0,
+            "bad_interrupt_count": 0,
+            "event_count": 9,
+            "failure_counts": {
+              "idle_when_questioned": 2,
+              "late_background_result": 3,
+              "missed_visual_change": 2
+            },
+            "idle_when_questioned_count": 2,
+            "interaction_quality": 0.4044444444444445,
+            "late_background_result_count": 3,
+            "missed_visual_change_count": 2,
+            "premature_answer_count": 0,
+            "residue_count": 7,
+            "total_residue_severity": 5.359999999999999
+          },
+          "policy_name": "no_op",
+          "residue_count": 7
+        },
+        "random": {
+          "metrics": {
+            "action_count": 12,
+            "backchannel_overuse_count": 0,
+            "background_delivery_rate": 0.0,
+            "bad_interrupt_count": 0,
+            "event_count": 12,
+            "failure_counts": {
+              "late_background_result": 6,
+              "missed_visual_change": 2
+            },
+            "idle_when_questioned_count": 0,
+            "interaction_quality": 0.45333333333333337,
+            "late_background_result_count": 6,
+            "missed_visual_change_count": 2,
+            "premature_answer_count": 0,
+            "residue_count": 8,
+            "total_residue_severity": 6.56
+          },
+          "policy_name": "random",
+          "residue_count": 8
+        }
+      },
+      "seed": 42,
+      "task_family_names": [
+        "adversarial_controls",
+        "background_delegation",
+        "mixed_stream",
+        "proactive_visual_event",
+        "turn_taking"
+      ],
+      "tasks": [
+        {
+          "family": "turn_taking",
+          "task_id": "turn_taking_0_seed42"
+        },
+        {
+          "family": "proactive_visual_event",
+          "task_id": "proactive_visual_event_1_seed42"
+        },
+        {
+          "family": "background_delegation",
+          "task_id": "background_delegation_2_seed42"
+        },
+        {
+          "family": "mixed_stream",
+          "task_id": "mixed_stream_3_seed42"
+        },
+        {
+          "family": "adversarial_controls",
+          "task_id": "adversarial_controls_4_seed42"
+        }
+      ]
+    }
+  ],
+  "seeds": [
+    42
+  ]
+}

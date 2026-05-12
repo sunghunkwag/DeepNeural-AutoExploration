@@ -2,7 +2,9 @@
 
 This repository now includes an English-only integration layer that connects a micro-turn interaction loop to the existing bounded RSI scaffold.
 
-The implementation is intentionally small, deterministic, and CPU-runnable. It does not claim to reproduce a private full-duplex model, private weights, or a closed architecture. Its purpose is to make interaction failures explicit enough that the existing bounded mechanisms can score them, transform them into evaluator decisions, and route them through failure-oriented improvement logic.
+The implementation is intentionally small, deterministic, and CPU-runnable. It does not claim to reproduce a private model, private weights, or a closed architecture. Its purpose is to make interaction failures explicit enough that the existing bounded mechanisms can score them, transform them into evaluator decisions, and route them through failure-oriented improvement logic.
+
+For the stream runtime, adapters, simulator, benchmark, manifest checks, and policy controls, see [Interaction Operating Scaffold](interaction_operating_scaffold.md).
 
 ## Implemented files
 
@@ -46,7 +48,7 @@ real-time-style interaction stream
 -> bounded validation-only improvement mechanics
 ```
 
-This preserves the repository's evidence boundary: it is a scaffold for studying closed-loop mechanics, not an AGI claim and not an open-ended autonomous self-improvement claim.
+This preserves the repository's evidence boundary: it is a scaffold for studying closed-loop mechanics, not a claim of general-purpose machine intelligence and not an unbounded self-improvement claim.
 
 ## Demo command
 
