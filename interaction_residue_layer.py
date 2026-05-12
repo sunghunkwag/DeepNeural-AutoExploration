@@ -1,11 +1,9 @@
 """Micro-turn interaction residue layer for bounded RSI experiments.
 
-This module adds a small, CPU-runnable interaction shell inspired by
-full-duplex interaction-model systems without copying any private model
-weights, private code, or closed architecture.  The goal is not to build a
-large real-time multimodal model.  The goal is to make interaction failures
-observable, scoreable, and exportable into the repository's bounded RSI
-mechanics.
+This module adds a small, CPU-runnable interaction shell for micro-turn
+simulation without copying any private model weights, private code, or closed
+architecture.  The goal is to make interaction failures observable, scoreable,
+and exportable into the repository's bounded RSI mechanics.
 
 Core loop:
 
@@ -386,11 +384,13 @@ class InteractionEvaluator:
         speech_continuation_threshold: float = 0.72,
         hard_interrupt_speech_threshold: float = 0.88,
         proactive_visual_threshold: float = 0.70,
+        delegation_uncertainty_threshold: float = 0.82,
         max_consecutive_backchannels: int = 2,
     ) -> None:
         self.speech_continuation_threshold = speech_continuation_threshold
         self.hard_interrupt_speech_threshold = hard_interrupt_speech_threshold
         self.proactive_visual_threshold = proactive_visual_threshold
+        self.delegation_uncertainty_threshold = delegation_uncertainty_threshold
         self.max_consecutive_backchannels = max_consecutive_backchannels
 
     def evaluate_trace(
@@ -472,6 +472,22 @@ class InteractionEvaluator:
                 )
             )
 
+        if (
+            action.kind == ACTION_ANSWER
+            and event.semantic_uncertainty >= self.delegation_uncertainty_threshold
+            and self._looks_like_question(event.text_delta)
+        ):
+            residues.append(
+                self._residue(
+                    "premature_answer",
+                    event,
+                    ACTION_DELEGATE_BACKGROUND,
+                    action.kind,
+                    max(0.55, event.semantic_uncertainty),
+                    {"semantic_uncertainty": event.semantic_uncertainty, "text_delta": event.text_delta},
+                )
+            )
+
         if self._visual_event_requires_intervention(event) and action.kind != ACTION_INTERRUPT_WARNING:
             residues.append(
                 self._residue(
@@ -524,7 +540,11 @@ class InteractionEvaluator:
         return residues
 
     def _visual_event_requires_intervention(self, event: MicroTurnEvent) -> bool:
-        return event.has_critical_visual_event() and event.anomaly_confidence >= self.proactive_visual_threshold
+        return (
+            event.has_critical_visual_event()
+            and event.anomaly_confidence >= self.proactive_visual_threshold
+            and event.user_speaking_prob < self.hard_interrupt_speech_threshold
+        )
 
     @staticmethod
     def _looks_like_question(text_delta: str) -> bool:
