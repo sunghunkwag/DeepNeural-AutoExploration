@@ -13,6 +13,7 @@ Supported claims:
 - It exposes AGI-relevant metrics such as adaptation improvement, OOD gap, world-model error, memory precision, planning success, rollback count, and validation-vs-test gap.
 - It can generate bounded operator programs, validate them, accept robust improvements, reject/roll back failures, reuse accepted candidates, and record manifests under validation-only and anti-cheat constraints.
 - It can learn a bounded self-model over validation-only candidate outcomes, compress failures into future-generation rewrite rules, and evolve acceptance evaluators only after adversarial checks.
+- It includes a bounded interaction scaffold for micro-turn simulation, JSONL trace replay, interaction residue extraction, evaluator-evolution bridge records, CPU-runnable interaction benchmarks, and manifest-backed anti-cheat controls.
 
 Unsupported claims:
 
@@ -66,6 +67,22 @@ Unsupported claims:
   - Evolves bounded evaluator candidates for OOD-transfer penalty, validation-to-test gap penalty, runtime cost penalty, instability penalty, novelty bonus, failure-rule penalty, and self-model uncertainty penalty under probation and adversarial checks.
 - `benchmarks/code_level_rsi_benchmark.py`
   - Smoke/quick/full benchmark for bounded code-level RSI mechanics using synthesized operator programs, validation-only acceptance, self-model-guided candidate ranking, failure-grammar candidate rewriting, probationary evaluator evolution, frozen OOD test evaluation, reuse tracking, and manifests.
+- `interaction_residue_layer.py`
+  - Core micro-turn events, baseline interaction policy, background task bus, evaluator, residues, and evaluator-compatible decision export.
+- `interaction_stream_runtime.py`
+  - Strictly ordered interaction streams, JSONL recording, deterministic replay, and trace divergence reporting.
+- `interaction_adapters.py`
+  - Dependency-light text delta, synthetic audio activity, symbolic visual event, and 200 ms-aligned combined micro-turn adapters.
+- `background_reasoning_simulator.py`
+  - Local deterministic simulator for delayed, missing, or corrupted background results.
+- `interaction_policies.py`
+  - Baseline, no-op, random, always-interrupt, always-listen, no-visual, and no-background policy variants for controls and ablations.
+- `interaction_evaluator_bridge.py`
+  - Converts interaction residues into evaluator-evolution-compatible decision records with no-op and random controls.
+- `interaction_manifest.py`
+  - Records interaction benchmark provenance, required metrics, control policy scores, replay status, config hash, and anti-cheat checks.
+- `benchmarks/interaction_residue_benchmark.py`
+  - Smoke/quick/full CPU-runnable benchmark for turn-taking, proactive visual events, background delegation, mixed streams, and adversarial controls.
 - `examples/closed_loop_demo.py`
   - Minimal inspectable demo of the full vertical slice.
 
@@ -152,6 +169,10 @@ The repository includes tests and code paths intended to catch common benchmark 
 - Self-model records marked as held-out test split are rejected.
 - Failure-grammar rules must alter future generated candidates to count as active.
 - Evaluator candidates cannot affect acceptance unless they pass checks against old evaluator behavior, hidden validation, wrong-world-model control, shuffled-memory control, no-op control, and random control.
+- Interaction traces must have strictly increasing timestamps for streaming and replay.
+- Interaction recorders reject hidden labels and held-out expected answers unless explicitly marked validation-only.
+- Interaction benchmarks reject events carrying expected policy actions and compare baseline behavior against no-op, random, always-interrupt, and always-silence controls.
+- Interaction benchmark manifests fail if replay fails, controls are missing, required metrics are absent, all control policies score identically, or intentionally bad controls produce zero residues.
 - A dead-code guard fails the recursive benchmark if all operators produce identical behavior.
 - Deterministic mode must be reproducible.
 - Stochastic exploration must vary outputs.
@@ -172,7 +193,7 @@ pip install pytest
 
 ```bash
 pytest -q
-# Expected after this upgrade: 72 passed
+# Expected after this upgrade: 121 passed
 ```
 
 ## Running the original sinusoid benchmark
@@ -188,6 +209,31 @@ python examples/closed_loop_demo.py
 ```
 
 The demo prints transparent logs for task sampling, support-only task inference, functional MAML adaptation, memory retrieval, world-model training, latent planning, and validation-gated self-improvement acceptance/rejection.
+
+## Running the bounded interaction scaffold
+
+The interaction residue demo runs a deterministic micro-turn trace and prints selected actions, evaluation metrics, residue records, evaluator decision records, and final interaction state:
+
+```bash
+python examples/interaction_residue_demo.py
+```
+
+The CPU-runnable interaction benchmark supports smoke, quick, and full modes:
+
+```bash
+python benchmarks/interaction_residue_benchmark.py --mode smoke --seed 42
+python benchmarks/interaction_residue_benchmark.py --mode quick --seed 42
+python benchmarks/interaction_residue_benchmark.py --mode full --seed 42
+```
+
+By default, results are written to:
+
+- `results/interaction_residue_<mode>_seed<seed>.json`
+- `results/interaction_residue_<mode>_seed<seed>.manifest.json`
+
+The benchmark reports interaction quality, bad interrupts, missed visual changes, late background results, premature answers, idle question handling, backchannel overuse, residue counts, total residue severity, background delivery rate, deterministic replay status, and control policy scores.
+
+The interaction scaffold is documented in `docs/interaction_operating_scaffold.md`.
 
 ## Running the AGI-scaffold benchmark
 
@@ -334,6 +380,7 @@ Current limitations:
 - Planning is exhaustive short-horizon search, not scalable model-predictive control.
 - Self-improvement candidates are bounded and executable, but still limited to a small DSL of adaptation-operator programs and CPU-sized procedural tasks.
 - The self-model and evaluator evolution are small supervised/probationary components trained from benchmark traces, not general self-understanding or autonomous research ability.
+- The interaction scaffold uses synthetic scalar and symbolic streams; it does not use microphones, webcams, external services, or live multimodal models.
 - Metrics are scaffold diagnostics, not evidence of general intelligence.
 - The recursive benchmark tests controlled mechanics and leakage resistance; it does not demonstrate open-ended self-improvement.
 
