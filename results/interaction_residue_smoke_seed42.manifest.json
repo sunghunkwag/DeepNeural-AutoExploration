@@ -70,7 +70,7 @@
     5000,
     6200
   ],
-  "git_commit": "5075c1acb60d754af16149144aff32a6c6757809",
+  "git_commit": "21c86a4f3981128f46c16cc51352cfba7bbe047b",
   "mode": "smoke",
   "number_of_actions": 11,
   "number_of_events": 11,
@@ -83,6 +83,6 @@
     "proactive_visual_event",
     "turn_taking"
   ],
-  "timestamp": "2026-05-12T12:59:55.985041+00:00",
+  "timestamp": "2026-05-12T13:10:41.655119+00:00",
   "used_test_labels": false
 }
