@@ -193,7 +193,7 @@ pip install pytest
 
 ```bash
 pytest -q
-# Expected after this upgrade: 121 passed
+# Expected after this upgrade: 159 passed
 ```
 
 ## Running the original sinusoid benchmark
@@ -378,6 +378,32 @@ Verification command:
 ```bash
 python scripts/verify_eie_smoke.py results/eie_instrument_evolution_smoke_seed42.json
 ```
+
+## RSI Orchestrator Core MVP
+
+Supported claim:
+
+This repository includes a bounded typed integration scaffold that routes candidate artifacts through a system graph, converts failed evaluations into EIE failure residues, records accepted/rejected lineage, and stores decisions in a structural memory layer.
+
+Unsupported claim:
+
+This does not demonstrate AGI, ASI, autonomous open-ended recursive self-improvement, or a technological singularity system.
+
+Minimal executable check:
+
+```bash
+python benchmarks/orchestrator_integration_smoke.py --mode smoke --seed 42
+python scripts/verify_orchestrator_smoke.py results/orchestrator_integration_smoke_seed42.json
+```
+
+Full validation:
+
+```bash
+python benchmarks/orchestrator_integration_smoke.py --mode full --seed 42
+python scripts/verify_orchestrator_smoke.py results/orchestrator_integration_full_seed42.json
+```
+
+Full validation is required before treating an integration change as complete. Minimal executable checks only prove that the pipeline runs; they do not prove the integration is robust.
 
 ## Minimal usage example
 
