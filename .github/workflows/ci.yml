@@ -28,6 +28,13 @@ jobs:
       - name: Run pytest
         run: python -m pytest -q
 
+      - name: Run EIE smoke benchmark
+        env:
+          EIE_JSON: ${{ runner.temp }}/eie_instrument_evolution_smoke_seed42.json
+        run: |
+          python benchmarks/eie_instrument_evolution_benchmark.py --mode smoke --seed 42 --output "$EIE_JSON"
+          python scripts/verify_eie_smoke.py "$EIE_JSON"
+
       - name: Run recursive smoke benchmark
         env:
           SMOKE_JSON: ${{ runner.temp }}/recursive_self_improvement_smoke_seed42.json
@@ -47,6 +54,8 @@ jobs:
         with:
           name: recursive-smoke-results
           path: |
+            ${{ runner.temp }}/eie_instrument_evolution_smoke_seed42.json
+            ${{ runner.temp }}/eie_instrument_evolution_smoke_seed42.manifest.json
             ${{ runner.temp }}/recursive_self_improvement_smoke_seed42.json
             ${{ runner.temp }}/recursive_self_improvement_smoke_seed42.manifest.json
             ${{ runner.temp }}/code_level_rsi_smoke_seed42.json

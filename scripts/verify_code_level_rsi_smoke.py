@@ -82,7 +82,8 @@ def verify(result_path: str | Path) -> None:
     result = _load(result_path)
     manifest_path = Path(str(result.get("manifest_path", result_path.with_suffix(".manifest.json"))))
     if not manifest_path.is_absolute():
-        manifest_path = result_path.parent / manifest_path
+        direct = manifest_path
+        manifest_path = direct if direct.exists() else result_path.parent / direct.name
     manifest = _load(manifest_path)
 
     _assert_task_ids(result, "result")

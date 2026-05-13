@@ -1,0 +1,823 @@
+{
+  "anti_cheat_checks_passed": [
+    "random seeds explicitly recorded",
+    "validation-only instrument acceptance enforced",
+    "hidden validation pressure included in acceptance measurement",
+    "held-out OOD test used only after decisions are frozen",
+    "used_test_signal_for_acceptance=false recorded",
+    "no-op instrument mutation tested and rejected",
+    "random instrument mutation control recorded",
+    "residue pressure computed from validation and hidden-validation only",
+    "before and after pressure measured for every acceptance decision",
+    "accepted instrument mutations record problem-space lineage",
+    "no external services or network calls used",
+    "no arbitrary generated source execution"
+  ],
+  "command": "python benchmarks/eie_instrument_evolution_benchmark.py",
+  "config": {
+    "benchmark": "eie_instrument_evolution",
+    "mode": "smoke",
+    "mode_config": {
+      "generations": 4,
+      "hidden_validation_repeats": 1,
+      "test_repeats": 1,
+      "validation_repeats": 1
+    },
+    "seed": 42,
+    "seeds": [
+      42
+    ]
+  },
+  "config_hash": "2714244fb4ee16a6",
+  "failure_residue_ledger": {
+    "records": [
+      {
+        "acceptance_driving": true,
+        "evidence": {
+          "blind_spot": "hidden_gap",
+          "missing_signal": "hidden_gap_probe"
+        },
+        "failure_type": "hidden_gap_blind_spot",
+        "generation": 0,
+        "residue_id": "validation_obs_0",
+        "resolved": true,
+        "severity": 0.6968878871074313,
+        "source": "deterministic_synthetic_eie_case",
+        "split": "validation",
+        "suspected_instrument": "observation_channel:obs0"
+      },
+      {
+        "acceptance_driving": true,
+        "evidence": {
+          "penalty": "validation_to_hidden_gap"
+        },
+        "failure_type": "validation_hidden_gap_overfit",
+        "generation": 0,
+        "residue_id": "validation_eval_0",
+        "resolved": true,
+        "severity": 0.46311211289256865,
+        "source": "deterministic_synthetic_eie_case",
+        "split": "validation",
+        "suspected_instrument": "evaluator:eval0"
+      },
+      {
+        "acceptance_driving": true,
+        "evidence": {
+          "perturbation": "hidden_shift"
+        },
+        "failure_type": "hidden_validation_coverage_gap",
+        "generation": 0,
+        "residue_id": "validation_experiment_0",
+        "resolved": true,
+        "severity": 0.35844394355371567,
+        "source": "deterministic_synthetic_eie_case",
+        "split": "validation",
+        "suspected_instrument": "experiment_unit:exp0"
+      },
+      {
+        "acceptance_driving": true,
+        "evidence": {
+          "brittle": false,
+          "min_diversity": 3,
+          "primitive": "stability_probe"
+        },
+        "failure_type": "limited_primitive_diversity",
+        "generation": 0,
+        "residue_id": "validation_operator_0",
+        "resolved": true,
+        "severity": 0.3115560564462843,
+        "source": "deterministic_synthetic_eie_case",
+        "split": "validation",
+        "suspected_instrument": "operator_generator:opgen0"
+      },
+      {
+        "acceptance_driving": true,
+        "evidence": {
+          "blind_spot": "hidden_gap",
+          "missing_signal": "hidden_gap_probe"
+        },
+        "failure_type": "hidden_gap_blind_spot",
+        "generation": 0,
+        "residue_id": "hidden_validation_obs_0",
+        "resolved": true,
+        "severity": 0.623218547046713,
+        "source": "deterministic_synthetic_eie_case",
+        "split": "hidden_validation",
+        "suspected_instrument": "observation_channel:obs0"
+      },
+      {
+        "acceptance_driving": true,
+        "evidence": {
+          "penalty": "validation_to_hidden_gap"
+        },
+        "failure_type": "validation_hidden_gap_overfit",
+        "generation": 0,
+        "residue_id": "hidden_validation_eval_0",
+        "resolved": true,
+        "severity": 0.42078145295328706,
+        "source": "deterministic_synthetic_eie_case",
+        "split": "hidden_validation",
+        "suspected_instrument": "evaluator:eval0"
+      },
+      {
+        "acceptance_driving": true,
+        "evidence": {
+          "perturbation": "hidden_shift"
+        },
+        "failure_type": "hidden_validation_coverage_gap",
+        "generation": 0,
+        "residue_id": "hidden_validation_experiment_0",
+        "resolved": true,
+        "severity": 0.3206092735233565,
+        "source": "deterministic_synthetic_eie_case",
+        "split": "hidden_validation",
+        "suspected_instrument": "experiment_unit:exp0"
+      },
+      {
+        "acceptance_driving": true,
+        "evidence": {
+          "brittle": false,
+          "min_diversity": 3,
+          "primitive": "stability_probe"
+        },
+        "failure_type": "limited_primitive_diversity",
+        "generation": 0,
+        "residue_id": "hidden_validation_operator_0",
+        "resolved": true,
+        "severity": 0.28239072647664354,
+        "source": "deterministic_synthetic_eie_case",
+        "split": "hidden_validation",
+        "suspected_instrument": "operator_generator:opgen0"
+      },
+      {
+        "acceptance_driving": false,
+        "evidence": {
+          "blind_spot": "hidden_gap",
+          "missing_signal": "hidden_gap_probe"
+        },
+        "failure_type": "hidden_gap_blind_spot",
+        "generation": 0,
+        "residue_id": "test_obs_0",
+        "resolved": false,
+        "severity": 0.6644655290710892,
+        "source": "deterministic_synthetic_eie_case",
+        "split": "test",
+        "suspected_instrument": "observation_channel:obs0"
+      },
+      {
+        "acceptance_driving": false,
+        "evidence": {
+          "penalty": "validation_to_hidden_gap"
+        },
+        "failure_type": "validation_hidden_gap_overfit",
+        "generation": 0,
+        "residue_id": "test_eval_0",
+        "resolved": false,
+        "severity": 0.43753447092891073,
+        "source": "deterministic_synthetic_eie_case",
+        "split": "test",
+        "suspected_instrument": "evaluator:eval0"
+      },
+      {
+        "acceptance_driving": false,
+        "evidence": {
+          "perturbation": "hidden_shift"
+        },
+        "failure_type": "hidden_validation_coverage_gap",
+        "generation": 0,
+        "residue_id": "test_experiment_0",
+        "resolved": false,
+        "severity": 0.34173276453554463,
+        "source": "deterministic_synthetic_eie_case",
+        "split": "test",
+        "suspected_instrument": "experiment_unit:exp0"
+      },
+      {
+        "acceptance_driving": false,
+        "evidence": {
+          "brittle": false,
+          "min_diversity": 3,
+          "primitive": "stability_probe"
+        },
+        "failure_type": "limited_primitive_diversity",
+        "generation": 0,
+        "residue_id": "test_operator_0",
+        "resolved": false,
+        "severity": 0.2947672354644553,
+        "source": "deterministic_synthetic_eie_case",
+        "split": "test",
+        "suspected_instrument": "operator_generator:opgen0"
+      }
+    ]
+  },
+  "git_commit": "fe82b14a4117fbf7103f561cf5eb712a61f26d72",
+  "held_out_test_used_only_after_freeze": true,
+  "instrument_mutation_contracts": [
+    {
+      "contract_id": "contract_g0_0_observation_channel_obs0",
+      "created_generation": 0,
+      "expected_residue_reduction": 0.33002660853853605,
+      "mutation_payload": {
+        "action": "reduce_blind_spot",
+        "blind_spot": "hidden_gap",
+        "signal": "hidden_gap_probe"
+      },
+      "reason": "highest unresolved pressure is 1.320106 on observation_channel:obs0",
+      "target_instrument_id": "obs0",
+      "target_instrument_type": "observation_channel",
+      "uses_test_signal": false
+    },
+    {
+      "contract_id": "contract_g1_1_evaluator_eval0",
+      "created_generation": 1,
+      "expected_residue_reduction": 0.22097339146146394,
+      "mutation_payload": {
+        "action": "strengthen_penalty",
+        "adversarial_check": "validation_to_hidden_gap",
+        "delta": 0.5,
+        "penalty": "validation_to_hidden_gap"
+      },
+      "reason": "highest unresolved pressure is 0.883894 on evaluator:eval0",
+      "target_instrument_id": "eval0",
+      "target_instrument_type": "evaluator",
+      "uses_test_signal": false
+    },
+    {
+      "contract_id": "contract_g2_2_experiment_unit_exp0",
+      "created_generation": 2,
+      "expected_residue_reduction": 0.16976330426926806,
+      "mutation_payload": {
+        "action": "add_hidden_validation_perturbation",
+        "perturbation": "hidden_shift"
+      },
+      "reason": "highest unresolved pressure is 0.679053 on experiment_unit:exp0",
+      "target_instrument_id": "exp0",
+      "target_instrument_type": "experiment_unit",
+      "uses_test_signal": false
+    },
+    {
+      "contract_id": "contract_g3_3_operator_generator_opgen0",
+      "created_generation": 3,
+      "expected_residue_reduction": 0.14848669573073198,
+      "mutation_payload": {
+        "action": "expand_primitive_diversity",
+        "primitive": "stability_probe"
+      },
+      "reason": "highest unresolved pressure is 0.593947 on operator_generator:opgen0",
+      "target_instrument_id": "opgen0",
+      "target_instrument_type": "operator_generator",
+      "uses_test_signal": false
+    },
+    {
+      "contract_id": "control_no_op_g4_4",
+      "created_generation": 4,
+      "expected_residue_reduction": 0.0,
+      "mutation_payload": {
+        "action": "no_op"
+      },
+      "reason": "no-op control must not reduce residue pressure",
+      "target_instrument_id": "exp0",
+      "target_instrument_type": "experiment_unit",
+      "uses_test_signal": false
+    },
+    {
+      "contract_id": "control_random_g5_5",
+      "created_generation": 5,
+      "expected_residue_reduction": 0.0,
+      "mutation_payload": {
+        "action": "expand_primitive_diversity",
+        "primitive": "random_control_479"
+      },
+      "reason": "random control must be measured and should not be accepted without pressure reduction",
+      "target_instrument_id": "opgen0",
+      "target_instrument_type": "operator_generator",
+      "uses_test_signal": false
+    }
+  ],
+  "instrument_mutation_decisions": [
+    {
+      "accepted": true,
+      "accepted_on_splits": [
+        "validation",
+        "hidden_validation"
+      ],
+      "after_pressure": {
+        "by_instrument": {
+          "evaluator:eval0": 0.8035396053144142,
+          "experiment_unit:exp0": 0.6790532170770722,
+          "observation_channel:obs0": 0.46203725195395046,
+          "operator_generator:opgen0": 0.5939467829229279
+        },
+        "by_split": {
+          "hidden_validation": 1.2036550850602468,
+          "validation": 1.3349217722081177
+        },
+        "residue_count": 8,
+        "total_pressure": 2.5385768572683647
+      },
+      "before_pressure": {
+        "by_instrument": {
+          "evaluator:eval0": 0.8035396053144142,
+          "experiment_unit:exp0": 0.6790532170770722,
+          "observation_channel:obs0": 1.3201064341541442,
+          "operator_generator:opgen0": 0.5939467829229279
+        },
+        "by_split": {
+          "hidden_validation": 1.6087471406406104,
+          "validation": 1.7878988988279483
+        },
+        "residue_count": 8,
+        "total_pressure": 3.3966460394685587
+      },
+      "contract": {
+        "contract_id": "contract_g0_0_observation_channel_obs0",
+        "created_generation": 0,
+        "expected_residue_reduction": 0.33002660853853605,
+        "mutation_payload": {
+          "action": "reduce_blind_spot",
+          "blind_spot": "hidden_gap",
+          "signal": "hidden_gap_probe"
+        },
+        "reason": "highest unresolved pressure is 1.320106 on observation_channel:obs0",
+        "target_instrument_id": "obs0",
+        "target_instrument_type": "observation_channel",
+        "uses_test_signal": false
+      },
+      "contract_id": "contract_g0_0_observation_channel_obs0",
+      "generation": 0,
+      "lineage_recorded": true,
+      "pressure_delta": 0.858069182200194,
+      "rejection_reason": "accepted",
+      "rollback": false,
+      "used_test_signal_for_acceptance": false,
+      "validation_only": true
+    },
+    {
+      "accepted": true,
+      "accepted_on_splits": [
+        "validation",
+        "hidden_validation"
+      ],
+      "after_pressure": {
+        "by_instrument": {
+          "evaluator:eval0": 0.47778030586262465,
+          "experiment_unit:exp0": 0.6790532170770722,
+          "operator_generator:opgen0": 0.5939467829229279
+        },
+        "by_split": {
+          "hidden_validation": 0.8304494340288039,
+          "validation": 0.9203308718338208
+        },
+        "residue_count": 6,
+        "total_pressure": 1.7507803058626248
+      },
+      "before_pressure": {
+        "by_instrument": {
+          "evaluator:eval0": 0.8035396053144142,
+          "experiment_unit:exp0": 0.6790532170770722,
+          "operator_generator:opgen0": 0.5939467829229279
+        },
+        "by_split": {
+          "hidden_validation": 0.9855285935938973,
+          "validation": 1.091011011720517
+        },
+        "residue_count": 6,
+        "total_pressure": 2.0765396053144145
+      },
+      "contract": {
+        "contract_id": "contract_g1_1_evaluator_eval0",
+        "created_generation": 1,
+        "expected_residue_reduction": 0.22097339146146394,
+        "mutation_payload": {
+          "action": "strengthen_penalty",
+          "adversarial_check": "validation_to_hidden_gap",
+          "delta": 0.5,
+          "penalty": "validation_to_hidden_gap"
+        },
+        "reason": "highest unresolved pressure is 0.883894 on evaluator:eval0",
+        "target_instrument_id": "eval0",
+        "target_instrument_type": "evaluator",
+        "uses_test_signal": false
+      },
+      "contract_id": "contract_g1_1_evaluator_eval0",
+      "generation": 1,
+      "lineage_recorded": true,
+      "pressure_delta": 0.3257592994517897,
+      "rejection_reason": "accepted",
+      "rollback": false,
+      "used_test_signal_for_acceptance": false,
+      "validation_only": true
+    },
+    {
+      "accepted": true,
+      "accepted_on_splits": [
+        "validation",
+        "hidden_validation"
+      ],
+      "after_pressure": {
+        "by_instrument": {
+          "experiment_unit:exp0": 0.3055739476846825,
+          "operator_generator:opgen0": 0.5939467829229279
+        },
+        "by_split": {
+          "hidden_validation": 0.426664899562154,
+          "validation": 0.47285583104545637
+        },
+        "residue_count": 4,
+        "total_pressure": 0.8995207306076104
+      },
+      "before_pressure": {
+        "by_instrument": {
+          "experiment_unit:exp0": 0.6790532170770722,
+          "operator_generator:opgen0": 0.5939467829229279
+        },
+        "by_split": {
+          "hidden_validation": 0.603,
+          "validation": 0.6699999999999999
+        },
+        "residue_count": 4,
+        "total_pressure": 1.2730000000000001
+      },
+      "contract": {
+        "contract_id": "contract_g2_2_experiment_unit_exp0",
+        "created_generation": 2,
+        "expected_residue_reduction": 0.16976330426926806,
+        "mutation_payload": {
+          "action": "add_hidden_validation_perturbation",
+          "perturbation": "hidden_shift"
+        },
+        "reason": "highest unresolved pressure is 0.679053 on experiment_unit:exp0",
+        "target_instrument_id": "exp0",
+        "target_instrument_type": "experiment_unit",
+        "uses_test_signal": false
+      },
+      "contract_id": "contract_g2_2_experiment_unit_exp0",
+      "generation": 2,
+      "lineage_recorded": true,
+      "pressure_delta": 0.37347926939238973,
+      "rejection_reason": "accepted",
+      "rollback": false,
+      "used_test_signal_for_acceptance": false,
+      "validation_only": true
+    },
+    {
+      "accepted": true,
+      "accepted_on_splits": [
+        "validation",
+        "hidden_validation"
+      ],
+      "after_pressure": {
+        "by_instrument": {
+          "operator_generator:opgen0": 0.3266707306076103
+        },
+        "by_split": {
+          "hidden_validation": 0.15531489956215397,
+          "validation": 0.17135583104545637
+        },
+        "residue_count": 2,
+        "total_pressure": 0.3266707306076103
+      },
+      "before_pressure": {
+        "by_instrument": {
+          "operator_generator:opgen0": 0.5939467829229279
+        },
+        "by_split": {
+          "hidden_validation": 0.28239072647664354,
+          "validation": 0.3115560564462843
+        },
+        "residue_count": 2,
+        "total_pressure": 0.5939467829229279
+      },
+      "contract": {
+        "contract_id": "contract_g3_3_operator_generator_opgen0",
+        "created_generation": 3,
+        "expected_residue_reduction": 0.14848669573073198,
+        "mutation_payload": {
+          "action": "expand_primitive_diversity",
+          "primitive": "stability_probe"
+        },
+        "reason": "highest unresolved pressure is 0.593947 on operator_generator:opgen0",
+        "target_instrument_id": "opgen0",
+        "target_instrument_type": "operator_generator",
+        "uses_test_signal": false
+      },
+      "contract_id": "contract_g3_3_operator_generator_opgen0",
+      "generation": 3,
+      "lineage_recorded": true,
+      "pressure_delta": 0.2672760523153176,
+      "rejection_reason": "accepted",
+      "rollback": false,
+      "used_test_signal_for_acceptance": false,
+      "validation_only": true
+    },
+    {
+      "accepted": false,
+      "accepted_on_splits": [],
+      "after_pressure": {
+        "by_instrument": {},
+        "by_split": {
+          "hidden_validation": 0.0,
+          "validation": 0.0
+        },
+        "residue_count": 0,
+        "total_pressure": 0.0
+      },
+      "before_pressure": {
+        "by_instrument": {},
+        "by_split": {
+          "hidden_validation": 0.0,
+          "validation": 0.0
+        },
+        "residue_count": 0,
+        "total_pressure": 0.0
+      },
+      "contract": {
+        "contract_id": "control_no_op_g4_4",
+        "created_generation": 4,
+        "expected_residue_reduction": 0.0,
+        "mutation_payload": {
+          "action": "no_op"
+        },
+        "reason": "no-op control must not reduce residue pressure",
+        "target_instrument_id": "exp0",
+        "target_instrument_type": "experiment_unit",
+        "uses_test_signal": false
+      },
+      "contract_id": "control_no_op_g4_4",
+      "generation": 4,
+      "lineage_recorded": false,
+      "pressure_delta": 0.0,
+      "rejection_reason": "residue_pressure_not_reduced",
+      "rollback": true,
+      "used_test_signal_for_acceptance": false,
+      "validation_only": true
+    },
+    {
+      "accepted": false,
+      "accepted_on_splits": [],
+      "after_pressure": {
+        "by_instrument": {},
+        "by_split": {
+          "hidden_validation": 0.0,
+          "validation": 0.0
+        },
+        "residue_count": 0,
+        "total_pressure": 0.0
+      },
+      "before_pressure": {
+        "by_instrument": {},
+        "by_split": {
+          "hidden_validation": 0.0,
+          "validation": 0.0
+        },
+        "residue_count": 0,
+        "total_pressure": 0.0
+      },
+      "contract": {
+        "contract_id": "control_random_g5_5",
+        "created_generation": 5,
+        "expected_residue_reduction": 0.0,
+        "mutation_payload": {
+          "action": "expand_primitive_diversity",
+          "primitive": "random_control_479"
+        },
+        "reason": "random control must be measured and should not be accepted without pressure reduction",
+        "target_instrument_id": "opgen0",
+        "target_instrument_type": "operator_generator",
+        "uses_test_signal": false
+      },
+      "contract_id": "control_random_g5_5",
+      "generation": 5,
+      "lineage_recorded": false,
+      "pressure_delta": 0.0,
+      "rejection_reason": "residue_pressure_not_reduced",
+      "rollback": true,
+      "used_test_signal_for_acceptance": false,
+      "validation_only": true
+    }
+  ],
+  "metric_summary": {
+    "aggregate": {
+      "accepted_instrument_mutation_count": {
+        "mean": 4.0,
+        "stderr": 0.0
+      },
+      "evaluator_penalty_strength_delta": {
+        "mean": 0.5,
+        "stderr": 0.0
+      },
+      "experiment_unit_coverage_gain": {
+        "mean": 1.0,
+        "stderr": 0.0
+      },
+      "final_residue_pressure": {
+        "mean": 0.0,
+        "stderr": 0.0
+      },
+      "initial_residue_pressure": {
+        "mean": 3.3966460394685587,
+        "stderr": 0.0
+      },
+      "mutation_contract_count": {
+        "mean": 6.0,
+        "stderr": 0.0
+      },
+      "no_op_control_score": {
+        "mean": 0.0,
+        "stderr": 0.0
+      },
+      "observation_blindspot_reduction": {
+        "mean": 1.0,
+        "stderr": 0.0
+      },
+      "operator_generator_diversity_gain": {
+        "mean": 1.0,
+        "stderr": 0.0
+      },
+      "problem_space_version_count": {
+        "mean": 5.0,
+        "stderr": 0.0
+      },
+      "random_control_score": {
+        "mean": 0.0,
+        "stderr": 0.0
+      },
+      "rejected_instrument_mutation_count": {
+        "mean": 2.0,
+        "stderr": 0.0
+      },
+      "residue_pressure_delta": {
+        "mean": 3.3966460394685587,
+        "stderr": 0.0
+      },
+      "rollback_count": {
+        "mean": 2.0,
+        "stderr": 0.0
+      },
+      "used_test_signal_for_acceptance": {
+        "mean": false,
+        "stderr": 0.0
+      },
+      "validation_to_hidden_gap": {
+        "mean": 0.0,
+        "stderr": 0.0
+      }
+    },
+    "metrics": {
+      "accepted_instrument_mutation_count": 4.0,
+      "evaluator_penalty_strength_delta": 0.5,
+      "experiment_unit_coverage_gain": 1.0,
+      "final_residue_pressure": 0.0,
+      "initial_residue_pressure": 3.3966460394685587,
+      "mutation_contract_count": 6.0,
+      "no_op_control_score": 0.0,
+      "observation_blindspot_reduction": 1.0,
+      "operator_generator_diversity_gain": 1.0,
+      "problem_space_version_count": 5.0,
+      "random_control_score": 0.0,
+      "rejected_instrument_mutation_count": 2.0,
+      "residue_pressure_delta": 3.3966460394685587,
+      "rollback_count": 2.0,
+      "used_test_signal_for_acceptance": false,
+      "validation_to_hidden_gap": 0.0
+    }
+  },
+  "mode": "smoke",
+  "no_op_control_recorded": true,
+  "problem_space_version_graph": {
+    "current_version_id": "v4",
+    "edges": [
+      {
+        "child_version_id": "v1",
+        "contract_id": "contract_g0_0_observation_channel_obs0",
+        "generation": 0,
+        "parent_version_id": "v0"
+      },
+      {
+        "child_version_id": "v2",
+        "contract_id": "contract_g1_1_evaluator_eval0",
+        "generation": 1,
+        "parent_version_id": "v1"
+      },
+      {
+        "child_version_id": "v3",
+        "contract_id": "contract_g2_2_experiment_unit_exp0",
+        "generation": 2,
+        "parent_version_id": "v2"
+      },
+      {
+        "child_version_id": "v4",
+        "contract_id": "contract_g3_3_operator_generator_opgen0",
+        "generation": 3,
+        "parent_version_id": "v3"
+      }
+    ],
+    "lineage": [
+      "v0",
+      "v1",
+      "v2",
+      "v3",
+      "v4"
+    ],
+    "versions": [
+      {
+        "created_by_contract_id": null,
+        "evaluator_ids": [
+          "eval0"
+        ],
+        "experiment_unit_ids": [
+          "exp0"
+        ],
+        "generation": 0,
+        "observation_channel_ids": [
+          "obs0"
+        ],
+        "operator_generator_ids": [
+          "opgen0"
+        ],
+        "parent_version_id": null,
+        "version_id": "v0"
+      },
+      {
+        "created_by_contract_id": "contract_g0_0_observation_channel_obs0",
+        "evaluator_ids": [
+          "eval0"
+        ],
+        "experiment_unit_ids": [
+          "exp0"
+        ],
+        "generation": 0,
+        "observation_channel_ids": [
+          "obs0"
+        ],
+        "operator_generator_ids": [
+          "opgen0"
+        ],
+        "parent_version_id": "v0",
+        "version_id": "v1"
+      },
+      {
+        "created_by_contract_id": "contract_g1_1_evaluator_eval0",
+        "evaluator_ids": [
+          "eval0"
+        ],
+        "experiment_unit_ids": [
+          "exp0"
+        ],
+        "generation": 1,
+        "observation_channel_ids": [
+          "obs0"
+        ],
+        "operator_generator_ids": [
+          "opgen0"
+        ],
+        "parent_version_id": "v1",
+        "version_id": "v2"
+      },
+      {
+        "created_by_contract_id": "contract_g2_2_experiment_unit_exp0",
+        "evaluator_ids": [
+          "eval0"
+        ],
+        "experiment_unit_ids": [
+          "exp0"
+        ],
+        "generation": 2,
+        "observation_channel_ids": [
+          "obs0"
+        ],
+        "operator_generator_ids": [
+          "opgen0"
+        ],
+        "parent_version_id": "v2",
+        "version_id": "v3"
+      },
+      {
+        "created_by_contract_id": "contract_g3_3_operator_generator_opgen0",
+        "evaluator_ids": [
+          "eval0"
+        ],
+        "experiment_unit_ids": [
+          "exp0"
+        ],
+        "generation": 3,
+        "observation_channel_ids": [
+          "obs0"
+        ],
+        "operator_generator_ids": [
+          "opgen0"
+        ],
+        "parent_version_id": "v3",
+        "version_id": "v4"
+      }
+    ]
+  },
+  "random_control_recorded": true,
+  "seed": 42,
+  "seeds": [
+    42
+  ],
+  "timestamp": "2026-05-13T10:34:05.692851+00:00",
+  "used_test_signal_for_acceptance": false,
+  "validation_only_acceptance_enforced": true
+}

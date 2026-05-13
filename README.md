@@ -355,6 +355,30 @@ The next-layer metrics include self-model prediction error, self-model error red
 
 Supported claim for this benchmark: the system can generate bounded operator programs, compile and execute them, rank them with a train/validation-only self-model, rewrite them using compressed failure rules, validate them under sandboxed validation-only controls, evolve probationary evaluators under adversarial checks, reject/roll back failures, accept robust improvements, reuse accepted candidates, evaluate frozen accepted programs on held-out OOD tests, and write audit manifests. Unsupported claim: broad intelligence or autonomous open-ended recursive self-improvement.
 
+## Epistemic Instrument Evolution (EIE)
+
+Epistemic Instrument Evolution means bounded mutation of the instruments used to observe failures, evaluate candidates, define experiments, generate operators, and version the problem space. In this repository, EIE is implemented as an explicit core layer with failure residue ledgers, observation channels, evaluator specs, experiment units, operator-generator specs, mutation contracts, problem-space version graphs, deterministic diagnosis, validation-only acceptance, rollback, and manifest checks.
+
+Supported claim:
+
+This repository implements a bounded Epistemic Instrument Evolution scaffold: failure residues can trigger controlled mutations to observation channels, evaluators, experiment units, operator generators, and problem-space versions under validation-only and anti-cheat controls.
+
+Unsupported claim:
+
+This does not demonstrate AGI, human-level intelligence, open-ended autonomous recursive self-improvement, or a technological singularity system.
+
+Smoke command:
+
+```bash
+python benchmarks/eie_instrument_evolution_benchmark.py --mode smoke --seed 42
+```
+
+Verification command:
+
+```bash
+python scripts/verify_eie_smoke.py results/eie_instrument_evolution_smoke_seed42.json
+```
+
 ## Minimal usage example
 
 ```python
