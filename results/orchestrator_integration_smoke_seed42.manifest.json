@@ -1,0 +1,4668 @@
+{
+  "anti_cheat_checks_passed": [
+    "random seed recorded",
+    "validation and hidden-validation are the only acceptance splits",
+    "held-out test records are stored only after decisions are frozen",
+    "artifacts marked uses_test_signal are rejected",
+    "test split evaluations do not drive acceptance",
+    "rejected artifacts include rejection reasons",
+    "failed acceptance evaluations produce failure residues",
+    "accepted artifacts have system graph lineage",
+    "accepted and rejected artifacts are stored in structural memory",
+    "no-op control artifact is rejected",
+    "random control artifact is recorded",
+    "no external APIs are used",
+    "no network calls are used",
+    "no LLM calls are used",
+    "no generated source is executed",
+    "outputs are JSON serializable"
+  ],
+  "artifact_bus": {
+    "artifact_count": 6,
+    "artifacts": [
+      {
+        "artifact_id": "noop_control_seed42_g0",
+        "artifact_type": "operator_program",
+        "created_generation": 0,
+        "declared_capabilities": [
+          "operator_program",
+          "deterministic_fixture"
+        ],
+        "payload": {
+          "control_kind": "no_op",
+          "hidden_validation_score": 0.5,
+          "program_family": "operator_program",
+          "role": "no_op",
+          "validation_score": 0.5
+        },
+        "producer": "hps_fixture_alpha",
+        "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+        "uses_test_signal": false
+      },
+      {
+        "artifact_id": "op_invalid_seed42_g0",
+        "artifact_type": "operator_program",
+        "created_generation": 0,
+        "declared_capabilities": [
+          "operator_program",
+          "deterministic_fixture"
+        ],
+        "payload": {
+          "control_kind": "candidate",
+          "hidden_validation_score": 0.36,
+          "program_family": "operator_program",
+          "role": "invalid_operator",
+          "validation_score": 0.42
+        },
+        "producer": "hps_fixture_alpha",
+        "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+        "uses_test_signal": false
+      },
+      {
+        "artifact_id": "op_test_signal_seed42_g0",
+        "artifact_type": "operator_program",
+        "created_generation": 0,
+        "declared_capabilities": [
+          "operator_program",
+          "deterministic_fixture"
+        ],
+        "payload": {
+          "control_kind": "candidate",
+          "hidden_validation_score": 0.89,
+          "program_family": "operator_program",
+          "role": "test_signal_trap",
+          "validation_score": 0.91
+        },
+        "producer": "hps_fixture_alpha",
+        "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+        "uses_test_signal": true
+      },
+      {
+        "artifact_id": "op_valid_seed42_g0",
+        "artifact_type": "operator_program",
+        "created_generation": 0,
+        "declared_capabilities": [
+          "operator_program",
+          "deterministic_fixture"
+        ],
+        "payload": {
+          "control_kind": "candidate",
+          "hidden_validation_score": 0.8,
+          "program_family": "operator_program",
+          "role": "valid_operator",
+          "validation_score": 0.86
+        },
+        "producer": "hps_fixture_alpha",
+        "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+        "uses_test_signal": false
+      },
+      {
+        "artifact_id": "primitive_valid_seed42_g0",
+        "artifact_type": "primitive_candidate",
+        "created_generation": 0,
+        "declared_capabilities": [
+          "primitive_candidate",
+          "deterministic_fixture"
+        ],
+        "payload": {
+          "control_kind": "candidate",
+          "hidden_validation_score": 0.73,
+          "program_family": "primitive_candidate",
+          "role": "valid_primitive",
+          "validation_score": 0.78
+        },
+        "producer": "hps_fixture_alpha",
+        "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+        "uses_test_signal": false
+      },
+      {
+        "artifact_id": "random_control_seed42_g0",
+        "artifact_type": "primitive_candidate",
+        "created_generation": 0,
+        "declared_capabilities": [
+          "primitive_candidate",
+          "deterministic_fixture"
+        ],
+        "payload": {
+          "control_kind": "random",
+          "hidden_validation_score": 0.47050021510445333,
+          "program_family": "primitive_candidate",
+          "role": "random",
+          "validation_score": 0.49278853596915767
+        },
+        "producer": "hps_fixture_alpha",
+        "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+        "uses_test_signal": false
+      }
+    ],
+    "decisions": [
+      {
+        "accepted": false,
+        "artifact_id": "noop_control_seed42_g0",
+        "decision_id": "decision:noop_control_seed42_g0",
+        "problem_space_version_id": "v0",
+        "rejection_reason": "no_op_control_failure",
+        "residue_ids": [
+          "residue:noop_control_seed42_g0:validation:0",
+          "residue:noop_control_seed42_g0:hidden_validation:1"
+        ],
+        "routed_to_eie": true,
+        "stored_in_memory": true,
+        "uses_test_signal_for_acceptance": false
+      },
+      {
+        "accepted": false,
+        "artifact_id": "op_invalid_seed42_g0",
+        "decision_id": "decision:op_invalid_seed42_g0",
+        "problem_space_version_id": "v0",
+        "rejection_reason": "invalid_operator_validation_failure",
+        "residue_ids": [
+          "residue:op_invalid_seed42_g0:validation:0",
+          "residue:op_invalid_seed42_g0:hidden_validation:1"
+        ],
+        "routed_to_eie": true,
+        "stored_in_memory": true,
+        "uses_test_signal_for_acceptance": false
+      },
+      {
+        "accepted": false,
+        "artifact_id": "op_test_signal_seed42_g0",
+        "decision_id": "decision:op_test_signal_seed42_g0",
+        "problem_space_version_id": "v0",
+        "rejection_reason": "artifact_uses_test_signal",
+        "residue_ids": [],
+        "routed_to_eie": false,
+        "stored_in_memory": true,
+        "uses_test_signal_for_acceptance": false
+      },
+      {
+        "accepted": true,
+        "artifact_id": "op_valid_seed42_g0",
+        "decision_id": "decision:op_valid_seed42_g0",
+        "problem_space_version_id": "v0",
+        "rejection_reason": "accepted",
+        "residue_ids": [],
+        "routed_to_eie": false,
+        "stored_in_memory": true,
+        "uses_test_signal_for_acceptance": false
+      },
+      {
+        "accepted": true,
+        "artifact_id": "primitive_valid_seed42_g0",
+        "decision_id": "decision:primitive_valid_seed42_g0",
+        "problem_space_version_id": "v0",
+        "rejection_reason": "accepted",
+        "residue_ids": [],
+        "routed_to_eie": false,
+        "stored_in_memory": true,
+        "uses_test_signal_for_acceptance": false
+      },
+      {
+        "accepted": false,
+        "artifact_id": "random_control_seed42_g0",
+        "decision_id": "decision:random_control_seed42_g0",
+        "problem_space_version_id": "v0",
+        "rejection_reason": "random_control_failure",
+        "residue_ids": [
+          "residue:random_control_seed42_g0:validation:0",
+          "residue:random_control_seed42_g0:hidden_validation:1"
+        ],
+        "routed_to_eie": true,
+        "stored_in_memory": true,
+        "uses_test_signal_for_acceptance": false
+      }
+    ],
+    "decisions_frozen": true,
+    "evaluation_count": 14,
+    "evaluations": {
+      "noop_control_seed42_g0": [
+        {
+          "artifact_id": "noop_control_seed42_g0",
+          "evaluator_id": "eie_evaluator",
+          "evidence": {
+            "blind_spot": "artifact_failure_pattern",
+            "control": "no_op_control",
+            "control_kind": "no_op",
+            "min_diversity": 3,
+            "missing_signal": "artifact_failure_probe",
+            "penalty": "validation_to_hidden_gap",
+            "primitive": "candidate_operator",
+            "rejection_reason": "no_op_control_failure",
+            "role": "no_op",
+            "score": 0.5,
+            "threshold": 0.7
+          },
+          "failure_type": "no_op_control_failure",
+          "metrics": {
+            "score": 0.5,
+            "threshold": 0.7
+          },
+          "passed": false,
+          "severity": 0.44999999999999996,
+          "split": "validation",
+          "uses_test_signal": false
+        },
+        {
+          "artifact_id": "noop_control_seed42_g0",
+          "evaluator_id": "eie_evaluator",
+          "evidence": {
+            "blind_spot": "artifact_failure_pattern",
+            "control": "no_op_control",
+            "control_kind": "no_op",
+            "min_diversity": 3,
+            "missing_signal": "artifact_failure_probe",
+            "penalty": "validation_to_hidden_gap",
+            "primitive": "candidate_operator",
+            "rejection_reason": "no_op_control_failure",
+            "role": "no_op",
+            "score": 0.5,
+            "threshold": 0.66
+          },
+          "failure_type": "no_op_control_failure",
+          "metrics": {
+            "score": 0.5,
+            "threshold": 0.66
+          },
+          "passed": false,
+          "severity": 0.41000000000000003,
+          "split": "hidden_validation",
+          "uses_test_signal": false
+        }
+      ],
+      "op_invalid_seed42_g0": [
+        {
+          "artifact_id": "op_invalid_seed42_g0",
+          "evaluator_id": "eie_evaluator",
+          "evidence": {
+            "blind_spot": "artifact_failure_pattern",
+            "control": "",
+            "control_kind": "candidate",
+            "min_diversity": 3,
+            "missing_signal": "artifact_failure_probe",
+            "penalty": "validation_to_hidden_gap",
+            "primitive": "candidate_operator",
+            "rejection_reason": "invalid_operator_validation_failure",
+            "role": "invalid_operator",
+            "score": 0.42,
+            "threshold": 0.7
+          },
+          "failure_type": "invalid_operator_validation_failure",
+          "metrics": {
+            "score": 0.42,
+            "threshold": 0.7
+          },
+          "passed": false,
+          "severity": 0.53,
+          "split": "validation",
+          "uses_test_signal": false
+        },
+        {
+          "artifact_id": "op_invalid_seed42_g0",
+          "evaluator_id": "eie_evaluator",
+          "evidence": {
+            "blind_spot": "artifact_failure_pattern",
+            "control": "",
+            "control_kind": "candidate",
+            "min_diversity": 3,
+            "missing_signal": "artifact_failure_probe",
+            "penalty": "validation_to_hidden_gap",
+            "primitive": "candidate_operator",
+            "rejection_reason": "invalid_operator_hidden_validation_failure",
+            "role": "invalid_operator",
+            "score": 0.36,
+            "threshold": 0.66
+          },
+          "failure_type": "invalid_operator_hidden_validation_failure",
+          "metrics": {
+            "score": 0.36,
+            "threshold": 0.66
+          },
+          "passed": false,
+          "severity": 0.55,
+          "split": "hidden_validation",
+          "uses_test_signal": false
+        },
+        {
+          "artifact_id": "op_invalid_seed42_g0",
+          "evaluator_id": "eie_evaluator",
+          "evidence": {
+            "post_freeze": true,
+            "score": 0.35
+          },
+          "failure_type": "held_out_test_record_failed",
+          "metrics": {
+            "score": 0.35,
+            "threshold": 0.64
+          },
+          "passed": false,
+          "severity": 0.49000000000000005,
+          "split": "test",
+          "uses_test_signal": false
+        }
+      ],
+      "op_test_signal_seed42_g0": [
+        {
+          "artifact_id": "op_test_signal_seed42_g0",
+          "evaluator_id": "eie_evaluator",
+          "evidence": {
+            "control_kind": "candidate",
+            "role": "test_signal_trap",
+            "score": 0.91,
+            "threshold": 0.7
+          },
+          "failure_type": null,
+          "metrics": {
+            "score": 0.91,
+            "threshold": 0.7
+          },
+          "passed": true,
+          "severity": 0.0,
+          "split": "validation",
+          "uses_test_signal": true
+        },
+        {
+          "artifact_id": "op_test_signal_seed42_g0",
+          "evaluator_id": "eie_evaluator",
+          "evidence": {
+            "control_kind": "candidate",
+            "role": "test_signal_trap",
+            "score": 0.89,
+            "threshold": 0.66
+          },
+          "failure_type": null,
+          "metrics": {
+            "score": 0.89,
+            "threshold": 0.66
+          },
+          "passed": true,
+          "severity": 0.0,
+          "split": "hidden_validation",
+          "uses_test_signal": true
+        }
+      ],
+      "op_valid_seed42_g0": [
+        {
+          "artifact_id": "op_valid_seed42_g0",
+          "evaluator_id": "eie_evaluator",
+          "evidence": {
+            "control_kind": "candidate",
+            "role": "valid_operator",
+            "score": 0.86,
+            "threshold": 0.7
+          },
+          "failure_type": null,
+          "metrics": {
+            "score": 0.86,
+            "threshold": 0.7
+          },
+          "passed": true,
+          "severity": 0.0,
+          "split": "validation",
+          "uses_test_signal": false
+        },
+        {
+          "artifact_id": "op_valid_seed42_g0",
+          "evaluator_id": "eie_evaluator",
+          "evidence": {
+            "control_kind": "candidate",
+            "role": "valid_operator",
+            "score": 0.8,
+            "threshold": 0.66
+          },
+          "failure_type": null,
+          "metrics": {
+            "score": 0.8,
+            "threshold": 0.66
+          },
+          "passed": true,
+          "severity": 0.0,
+          "split": "hidden_validation",
+          "uses_test_signal": false
+        },
+        {
+          "artifact_id": "op_valid_seed42_g0",
+          "evaluator_id": "eie_evaluator",
+          "evidence": {
+            "post_freeze": true,
+            "score": 0.8
+          },
+          "failure_type": null,
+          "metrics": {
+            "score": 0.8,
+            "threshold": 0.64
+          },
+          "passed": true,
+          "severity": 0.0,
+          "split": "test",
+          "uses_test_signal": false
+        }
+      ],
+      "primitive_valid_seed42_g0": [
+        {
+          "artifact_id": "primitive_valid_seed42_g0",
+          "evaluator_id": "eie_evaluator",
+          "evidence": {
+            "control_kind": "candidate",
+            "role": "valid_primitive",
+            "score": 0.78,
+            "threshold": 0.7
+          },
+          "failure_type": null,
+          "metrics": {
+            "score": 0.78,
+            "threshold": 0.7
+          },
+          "passed": true,
+          "severity": 0.0,
+          "split": "validation",
+          "uses_test_signal": false
+        },
+        {
+          "artifact_id": "primitive_valid_seed42_g0",
+          "evaluator_id": "eie_evaluator",
+          "evidence": {
+            "control_kind": "candidate",
+            "role": "valid_primitive",
+            "score": 0.73,
+            "threshold": 0.66
+          },
+          "failure_type": null,
+          "metrics": {
+            "score": 0.73,
+            "threshold": 0.66
+          },
+          "passed": true,
+          "severity": 0.0,
+          "split": "hidden_validation",
+          "uses_test_signal": false
+        }
+      ],
+      "random_control_seed42_g0": [
+        {
+          "artifact_id": "random_control_seed42_g0",
+          "evaluator_id": "eie_evaluator",
+          "evidence": {
+            "blind_spot": "artifact_failure_pattern",
+            "control": "random_control",
+            "control_kind": "random",
+            "min_diversity": 3,
+            "missing_signal": "artifact_failure_probe",
+            "penalty": "validation_to_hidden_gap",
+            "primitive": "unstable_primitive",
+            "rejection_reason": "random_control_failure",
+            "role": "random",
+            "score": 0.49278853596915767,
+            "threshold": 0.7
+          },
+          "failure_type": "random_control_failure",
+          "metrics": {
+            "score": 0.49278853596915767,
+            "threshold": 0.7
+          },
+          "passed": false,
+          "severity": 0.4572114640308423,
+          "split": "validation",
+          "uses_test_signal": false
+        },
+        {
+          "artifact_id": "random_control_seed42_g0",
+          "evaluator_id": "eie_evaluator",
+          "evidence": {
+            "blind_spot": "artifact_failure_pattern",
+            "control": "random_control",
+            "control_kind": "random",
+            "min_diversity": 3,
+            "missing_signal": "artifact_failure_probe",
+            "penalty": "validation_to_hidden_gap",
+            "primitive": "unstable_primitive",
+            "rejection_reason": "random_control_failure",
+            "role": "random",
+            "score": 0.47050021510445333,
+            "threshold": 0.66
+          },
+          "failure_type": "random_control_failure",
+          "metrics": {
+            "score": 0.47050021510445333,
+            "threshold": 0.66
+          },
+          "passed": false,
+          "severity": 0.4394997848955467,
+          "split": "hidden_validation",
+          "uses_test_signal": false
+        }
+      ]
+    }
+  },
+  "command": "python benchmarks/orchestrator_integration_smoke.py",
+  "config": {
+    "artifact_ids": [
+      "op_valid_seed42_g0",
+      "op_invalid_seed42_g0",
+      "primitive_valid_seed42_g0",
+      "op_test_signal_seed42_g0",
+      "noop_control_seed42_g0",
+      "random_control_seed42_g0"
+    ],
+    "benchmark": "orchestrator_integration",
+    "generations": [
+      0
+    ],
+    "mode": "smoke",
+    "seed": 42
+  },
+  "config_hash": "496d1be1e74fba40",
+  "eie_mutation_decisions": [
+    {
+      "accepted": false,
+      "accepted_on_splits": [],
+      "after_pressure": {
+        "by_instrument": {
+          "operator_generator:orch_opgen0": 1.08
+        },
+        "by_split": {
+          "hidden_validation": 0.55,
+          "validation": 0.53
+        },
+        "residue_count": 2,
+        "total_pressure": 1.08
+      },
+      "before_pressure": {
+        "by_instrument": {
+          "operator_generator:orch_opgen0": 1.08
+        },
+        "by_split": {
+          "hidden_validation": 0.55,
+          "validation": 0.53
+        },
+        "residue_count": 2,
+        "total_pressure": 1.08
+      },
+      "contract": {
+        "contract_id": "contract_g0_0_operator_generator_orch_opgen0",
+        "created_generation": 0,
+        "expected_residue_reduction": 0.27,
+        "mutation_payload": {
+          "action": "expand_primitive_diversity",
+          "primitive": "candidate_operator"
+        },
+        "reason": "highest unresolved pressure is 1.080000 on operator_generator:orch_opgen0",
+        "target_instrument_id": "orch_opgen0",
+        "target_instrument_type": "operator_generator",
+        "uses_test_signal": false
+      },
+      "contract_id": "contract_g0_0_operator_generator_orch_opgen0",
+      "generation": 0,
+      "lineage_recorded": false,
+      "pressure_delta": 0.0,
+      "rejection_reason": "residue_pressure_not_reduced",
+      "rollback": true,
+      "used_test_signal_for_acceptance": false,
+      "validation_only": true
+    },
+    {
+      "accepted": false,
+      "accepted_on_splits": [],
+      "after_pressure": {
+        "by_instrument": {
+          "experiment_unit:orch_exp0": 0.387,
+          "operator_generator:orch_opgen0": 1.08
+        },
+        "by_split": {
+          "hidden_validation": 0.7345,
+          "validation": 0.7325
+        },
+        "residue_count": 4,
+        "total_pressure": 1.467
+      },
+      "before_pressure": {
+        "by_instrument": {
+          "experiment_unit:orch_exp0": 0.387,
+          "operator_generator:orch_opgen0": 1.08
+        },
+        "by_split": {
+          "hidden_validation": 0.7345,
+          "validation": 0.7325
+        },
+        "residue_count": 4,
+        "total_pressure": 1.467
+      },
+      "contract": {
+        "contract_id": "contract_g0_1_operator_generator_orch_opgen0",
+        "created_generation": 0,
+        "expected_residue_reduction": 0.27,
+        "mutation_payload": {
+          "action": "expand_primitive_diversity",
+          "primitive": "candidate_operator"
+        },
+        "reason": "highest unresolved pressure is 1.080000 on operator_generator:orch_opgen0",
+        "target_instrument_id": "orch_opgen0",
+        "target_instrument_type": "operator_generator",
+        "uses_test_signal": false
+      },
+      "contract_id": "contract_g0_1_operator_generator_orch_opgen0",
+      "generation": 0,
+      "lineage_recorded": false,
+      "pressure_delta": 0.0,
+      "rejection_reason": "residue_pressure_not_reduced",
+      "rollback": true,
+      "used_test_signal_for_acceptance": false,
+      "validation_only": true
+    },
+    {
+      "accepted": false,
+      "accepted_on_splits": [],
+      "after_pressure": {
+        "by_instrument": {
+          "experiment_unit:orch_exp0": 0.387,
+          "operator_generator:orch_opgen0": 1.976711248926389
+        },
+        "by_split": {
+          "hidden_validation": 1.1739997848955468,
+          "validation": 1.1897114640308424
+        },
+        "residue_count": 6,
+        "total_pressure": 2.363711248926389
+      },
+      "before_pressure": {
+        "by_instrument": {
+          "experiment_unit:orch_exp0": 0.387,
+          "operator_generator:orch_opgen0": 1.976711248926389
+        },
+        "by_split": {
+          "hidden_validation": 1.1739997848955468,
+          "validation": 1.1897114640308424
+        },
+        "residue_count": 6,
+        "total_pressure": 2.363711248926389
+      },
+      "contract": {
+        "contract_id": "contract_g0_2_operator_generator_orch_opgen0",
+        "created_generation": 0,
+        "expected_residue_reduction": 0.49417781223159724,
+        "mutation_payload": {
+          "action": "expand_primitive_diversity",
+          "primitive": "candidate_operator"
+        },
+        "reason": "highest unresolved pressure is 1.976711 on operator_generator:orch_opgen0",
+        "target_instrument_id": "orch_opgen0",
+        "target_instrument_type": "operator_generator",
+        "uses_test_signal": false
+      },
+      "contract_id": "contract_g0_2_operator_generator_orch_opgen0",
+      "generation": 0,
+      "lineage_recorded": false,
+      "pressure_delta": 0.0,
+      "rejection_reason": "residue_pressure_not_reduced",
+      "rollback": true,
+      "used_test_signal_for_acceptance": false,
+      "validation_only": true
+    }
+  ],
+  "failure_residues": [
+    {
+      "evidence": {
+        "artifact_id": "op_invalid_seed42_g0",
+        "artifact_type": "operator_program",
+        "blind_spot": "artifact_failure_pattern",
+        "control": "",
+        "control_kind": "candidate",
+        "min_diversity": 3,
+        "missing_signal": "artifact_failure_probe",
+        "penalty": "validation_to_hidden_gap",
+        "primitive": "candidate_operator",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "invalid_operator_validation_failure",
+        "role": "invalid_operator",
+        "score": 0.42,
+        "threshold": 0.7
+      },
+      "failure_type": "invalid_operator_validation_failure",
+      "generation": 0,
+      "residue_id": "residue:op_invalid_seed42_g0:validation:0",
+      "severity": 0.53,
+      "source": "orchestrator:eie_evaluator",
+      "split": "validation",
+      "suspected_instrument": "operator_generator:orch_opgen0"
+    },
+    {
+      "evidence": {
+        "artifact_id": "op_invalid_seed42_g0",
+        "artifact_type": "operator_program",
+        "blind_spot": "artifact_failure_pattern",
+        "control": "",
+        "control_kind": "candidate",
+        "min_diversity": 3,
+        "missing_signal": "artifact_failure_probe",
+        "penalty": "validation_to_hidden_gap",
+        "primitive": "candidate_operator",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "invalid_operator_hidden_validation_failure",
+        "role": "invalid_operator",
+        "score": 0.36,
+        "threshold": 0.66
+      },
+      "failure_type": "invalid_operator_hidden_validation_failure",
+      "generation": 0,
+      "residue_id": "residue:op_invalid_seed42_g0:hidden_validation:1",
+      "severity": 0.55,
+      "source": "orchestrator:eie_evaluator",
+      "split": "hidden_validation",
+      "suspected_instrument": "operator_generator:orch_opgen0"
+    },
+    {
+      "evidence": {
+        "artifact_id": "noop_control_seed42_g0",
+        "artifact_type": "operator_program",
+        "blind_spot": "artifact_failure_pattern",
+        "control": "no_op_control",
+        "control_kind": "no_op",
+        "min_diversity": 3,
+        "missing_signal": "artifact_failure_probe",
+        "penalty": "validation_to_hidden_gap",
+        "primitive": "candidate_operator",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "no_op_control_failure",
+        "role": "no_op",
+        "score": 0.5,
+        "threshold": 0.7
+      },
+      "failure_type": "no_op_control_failure",
+      "generation": 0,
+      "residue_id": "residue:noop_control_seed42_g0:validation:0",
+      "severity": 0.44999999999999996,
+      "source": "orchestrator:eie_evaluator",
+      "split": "validation",
+      "suspected_instrument": "experiment_unit:orch_exp0"
+    },
+    {
+      "evidence": {
+        "artifact_id": "noop_control_seed42_g0",
+        "artifact_type": "operator_program",
+        "blind_spot": "artifact_failure_pattern",
+        "control": "no_op_control",
+        "control_kind": "no_op",
+        "min_diversity": 3,
+        "missing_signal": "artifact_failure_probe",
+        "penalty": "validation_to_hidden_gap",
+        "primitive": "candidate_operator",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "no_op_control_failure",
+        "role": "no_op",
+        "score": 0.5,
+        "threshold": 0.66
+      },
+      "failure_type": "no_op_control_failure",
+      "generation": 0,
+      "residue_id": "residue:noop_control_seed42_g0:hidden_validation:1",
+      "severity": 0.41000000000000003,
+      "source": "orchestrator:eie_evaluator",
+      "split": "hidden_validation",
+      "suspected_instrument": "experiment_unit:orch_exp0"
+    },
+    {
+      "evidence": {
+        "artifact_id": "random_control_seed42_g0",
+        "artifact_type": "primitive_candidate",
+        "blind_spot": "artifact_failure_pattern",
+        "control": "random_control",
+        "control_kind": "random",
+        "min_diversity": 3,
+        "missing_signal": "artifact_failure_probe",
+        "penalty": "validation_to_hidden_gap",
+        "primitive": "unstable_primitive",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "random_control_failure",
+        "role": "random",
+        "score": 0.49278853596915767,
+        "threshold": 0.7
+      },
+      "failure_type": "random_control_failure",
+      "generation": 0,
+      "residue_id": "residue:random_control_seed42_g0:validation:0",
+      "severity": 0.4572114640308423,
+      "source": "orchestrator:eie_evaluator",
+      "split": "validation",
+      "suspected_instrument": "operator_generator:orch_opgen0"
+    },
+    {
+      "evidence": {
+        "artifact_id": "random_control_seed42_g0",
+        "artifact_type": "primitive_candidate",
+        "blind_spot": "artifact_failure_pattern",
+        "control": "random_control",
+        "control_kind": "random",
+        "min_diversity": 3,
+        "missing_signal": "artifact_failure_probe",
+        "penalty": "validation_to_hidden_gap",
+        "primitive": "unstable_primitive",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "random_control_failure",
+        "role": "random",
+        "score": 0.47050021510445333,
+        "threshold": 0.66
+      },
+      "failure_type": "random_control_failure",
+      "generation": 0,
+      "residue_id": "residue:random_control_seed42_g0:hidden_validation:1",
+      "severity": 0.4394997848955467,
+      "source": "orchestrator:eie_evaluator",
+      "split": "hidden_validation",
+      "suspected_instrument": "operator_generator:orch_opgen0"
+    }
+  ],
+  "git_commit": "fa352a5f45e30847b465a9fb41278ac2b1853450",
+  "held_out_test_used_only_after_freeze": true,
+  "metric_summary": {
+    "accepted_artifact_count": 2,
+    "artifact_count": 6,
+    "deterministic_replay_passed": true,
+    "eie_routed_residue_count": 6,
+    "failure_residue_count": 6,
+    "full_validation_passed": false,
+    "graph_edge_count": 42,
+    "graph_node_count": 17,
+    "held_out_test_record_count": 2,
+    "hidden_validation_evaluation_count": 6,
+    "lineage_record_count": 2,
+    "manifest_path": "results\\orchestrator_integration_smoke_seed42.manifest.json",
+    "memory_record_count": 15,
+    "mode": "smoke",
+    "no_op_control_rejected": true,
+    "random_control_recorded": true,
+    "rejected_artifact_count": 4,
+    "test_signal_artifact_rejected": true,
+    "used_test_signal_for_acceptance": false,
+    "validation_evaluation_count": 6
+  },
+  "mode": "smoke",
+  "non_residue_reasons": [
+    {
+      "artifact_id": "op_test_signal_seed42_g0",
+      "reason": "artifact_uses_test_signal",
+      "split": "acceptance"
+    },
+    {
+      "artifact_id": "op_invalid_seed42_g0",
+      "failure_type": "held_out_test_record_failed",
+      "reason": "held_out_test_record_after_freeze_not_used_for_acceptance",
+      "split": "test"
+    }
+  ],
+  "orchestrator_decisions": [
+    {
+      "accepted": true,
+      "artifact_id": "op_valid_seed42_g0",
+      "decision_id": "decision:op_valid_seed42_g0",
+      "problem_space_version_id": "v0",
+      "rejection_reason": "accepted",
+      "residue_ids": [],
+      "routed_to_eie": false,
+      "stored_in_memory": true,
+      "uses_test_signal_for_acceptance": false
+    },
+    {
+      "accepted": false,
+      "artifact_id": "op_invalid_seed42_g0",
+      "decision_id": "decision:op_invalid_seed42_g0",
+      "problem_space_version_id": "v0",
+      "rejection_reason": "invalid_operator_validation_failure",
+      "residue_ids": [
+        "residue:op_invalid_seed42_g0:validation:0",
+        "residue:op_invalid_seed42_g0:hidden_validation:1"
+      ],
+      "routed_to_eie": true,
+      "stored_in_memory": true,
+      "uses_test_signal_for_acceptance": false
+    },
+    {
+      "accepted": true,
+      "artifact_id": "primitive_valid_seed42_g0",
+      "decision_id": "decision:primitive_valid_seed42_g0",
+      "problem_space_version_id": "v0",
+      "rejection_reason": "accepted",
+      "residue_ids": [],
+      "routed_to_eie": false,
+      "stored_in_memory": true,
+      "uses_test_signal_for_acceptance": false
+    },
+    {
+      "accepted": false,
+      "artifact_id": "op_test_signal_seed42_g0",
+      "decision_id": "decision:op_test_signal_seed42_g0",
+      "problem_space_version_id": "v0",
+      "rejection_reason": "artifact_uses_test_signal",
+      "residue_ids": [],
+      "routed_to_eie": false,
+      "stored_in_memory": true,
+      "uses_test_signal_for_acceptance": false
+    },
+    {
+      "accepted": false,
+      "artifact_id": "noop_control_seed42_g0",
+      "decision_id": "decision:noop_control_seed42_g0",
+      "problem_space_version_id": "v0",
+      "rejection_reason": "no_op_control_failure",
+      "residue_ids": [
+        "residue:noop_control_seed42_g0:validation:0",
+        "residue:noop_control_seed42_g0:hidden_validation:1"
+      ],
+      "routed_to_eie": true,
+      "stored_in_memory": true,
+      "uses_test_signal_for_acceptance": false
+    },
+    {
+      "accepted": false,
+      "artifact_id": "random_control_seed42_g0",
+      "decision_id": "decision:random_control_seed42_g0",
+      "problem_space_version_id": "v0",
+      "rejection_reason": "random_control_failure",
+      "residue_ids": [
+        "residue:random_control_seed42_g0:validation:0",
+        "residue:random_control_seed42_g0:hidden_validation:1"
+      ],
+      "routed_to_eie": true,
+      "stored_in_memory": true,
+      "uses_test_signal_for_acceptance": false
+    }
+  ],
+  "seed": 42,
+  "structural_memory": {
+    "accepted_lineage": [
+      {
+        "accepted": true,
+        "artifact_id": "op_valid_seed42_g0",
+        "artifact_type": "operator_program",
+        "decision_id": "decision:op_valid_seed42_g0",
+        "lineage": {
+          "artifact_id": "op_valid_seed42_g0",
+          "artifact_node": {
+            "capabilities": [
+              "operator_program",
+              "deterministic_fixture"
+            ],
+            "metadata": {
+              "artifact_id": "op_valid_seed42_g0",
+              "artifact_type": "operator_program",
+              "created_generation": 0,
+              "declared_capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "payload": {
+                "control_kind": "candidate",
+                "hidden_validation_score": 0.8,
+                "program_family": "operator_program",
+                "role": "valid_operator",
+                "validation_score": 0.86
+              },
+              "producer": "hps_fixture_alpha",
+              "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+              "uses_test_signal": false
+            },
+            "module_name": "orchestrator_core.schemas.CandidateArtifact",
+            "node_id": "artifact:op_valid_seed42_g0",
+            "node_type": "artifact",
+            "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+          },
+          "downstream_nodes": [
+            {
+              "capabilities": [
+                "problem_space_lineage"
+              ],
+              "metadata": {
+                "version_id": "v0"
+              },
+              "module_name": "eie_core.ProblemSpaceVersion",
+              "node_id": "problem_space_version:v0",
+              "node_type": "problem_space_version",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ],
+          "incoming_edges": [
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "produces:hps_fixture_alpha:op_valid_seed42_g0",
+              "edge_type": "produces",
+              "metadata": {
+                "generation": 0
+              },
+              "source_node_id": "hps_fixture_alpha",
+              "target_node_id": "artifact:op_valid_seed42_g0"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "stores:op_valid_seed42_g0:decision:op_valid_seed42_g0",
+              "edge_type": "stores",
+              "metadata": {
+                "accepted": true
+              },
+              "source_node_id": "structural_memory",
+              "target_node_id": "artifact:op_valid_seed42_g0"
+            }
+          ],
+          "outgoing_edges": [
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "accepts:op_valid_seed42_g0:v0",
+              "edge_type": "accepts",
+              "metadata": {
+                "decision_id": "decision:op_valid_seed42_g0"
+              },
+              "source_node_id": "artifact:op_valid_seed42_g0",
+              "target_node_id": "problem_space_version:v0"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "evaluates:op_valid_seed42_g0:hidden_validation:1",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": true,
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:op_valid_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "evaluates:op_valid_seed42_g0:validation:0",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": true,
+                "split": "validation"
+              },
+              "source_node_id": "artifact:op_valid_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            }
+          ],
+          "upstream_nodes": [
+            {
+              "capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "metadata": {
+                "seed": 42
+              },
+              "module_name": "orchestrator_core.adapters.HybridProgramSynthesisAdapter",
+              "node_id": "hps_fixture_alpha",
+              "node_type": "candidate_generator",
+              "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ]
+        },
+        "problem_space_version_id": "v0",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "accepted",
+        "residue_ids": []
+      },
+      {
+        "accepted": true,
+        "artifact_id": "primitive_valid_seed42_g0",
+        "artifact_type": "primitive_candidate",
+        "decision_id": "decision:primitive_valid_seed42_g0",
+        "lineage": {
+          "artifact_id": "primitive_valid_seed42_g0",
+          "artifact_node": {
+            "capabilities": [
+              "primitive_candidate",
+              "deterministic_fixture"
+            ],
+            "metadata": {
+              "artifact_id": "primitive_valid_seed42_g0",
+              "artifact_type": "primitive_candidate",
+              "created_generation": 0,
+              "declared_capabilities": [
+                "primitive_candidate",
+                "deterministic_fixture"
+              ],
+              "payload": {
+                "control_kind": "candidate",
+                "hidden_validation_score": 0.73,
+                "program_family": "primitive_candidate",
+                "role": "valid_primitive",
+                "validation_score": 0.78
+              },
+              "producer": "hps_fixture_alpha",
+              "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+              "uses_test_signal": false
+            },
+            "module_name": "orchestrator_core.schemas.CandidateArtifact",
+            "node_id": "artifact:primitive_valid_seed42_g0",
+            "node_type": "artifact",
+            "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+          },
+          "downstream_nodes": [
+            {
+              "capabilities": [
+                "problem_space_lineage"
+              ],
+              "metadata": {
+                "version_id": "v0"
+              },
+              "module_name": "eie_core.ProblemSpaceVersion",
+              "node_id": "problem_space_version:v0",
+              "node_type": "problem_space_version",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ],
+          "incoming_edges": [
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "produces:hps_fixture_alpha:primitive_valid_seed42_g0",
+              "edge_type": "produces",
+              "metadata": {
+                "generation": 0
+              },
+              "source_node_id": "hps_fixture_alpha",
+              "target_node_id": "artifact:primitive_valid_seed42_g0"
+            },
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "stores:primitive_valid_seed42_g0:decision:primitive_valid_seed42_g0",
+              "edge_type": "stores",
+              "metadata": {
+                "accepted": true
+              },
+              "source_node_id": "structural_memory",
+              "target_node_id": "artifact:primitive_valid_seed42_g0"
+            }
+          ],
+          "outgoing_edges": [
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "accepts:primitive_valid_seed42_g0:v0",
+              "edge_type": "accepts",
+              "metadata": {
+                "decision_id": "decision:primitive_valid_seed42_g0"
+              },
+              "source_node_id": "artifact:primitive_valid_seed42_g0",
+              "target_node_id": "problem_space_version:v0"
+            },
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "evaluates:primitive_valid_seed42_g0:hidden_validation:1",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": true,
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:primitive_valid_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "evaluates:primitive_valid_seed42_g0:validation:0",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": true,
+                "split": "validation"
+              },
+              "source_node_id": "artifact:primitive_valid_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            }
+          ],
+          "upstream_nodes": [
+            {
+              "capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "metadata": {
+                "seed": 42
+              },
+              "module_name": "orchestrator_core.adapters.HybridProgramSynthesisAdapter",
+              "node_id": "hps_fixture_alpha",
+              "node_type": "candidate_generator",
+              "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ]
+        },
+        "problem_space_version_id": "v0",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "accepted",
+        "residue_ids": []
+      }
+    ],
+    "decision_records": [
+      {
+        "accepted": true,
+        "artifact_id": "op_valid_seed42_g0",
+        "artifact_type": "operator_program",
+        "decision_id": "decision:op_valid_seed42_g0",
+        "lineage": {
+          "artifact_id": "op_valid_seed42_g0",
+          "artifact_node": {
+            "capabilities": [
+              "operator_program",
+              "deterministic_fixture"
+            ],
+            "metadata": {
+              "artifact_id": "op_valid_seed42_g0",
+              "artifact_type": "operator_program",
+              "created_generation": 0,
+              "declared_capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "payload": {
+                "control_kind": "candidate",
+                "hidden_validation_score": 0.8,
+                "program_family": "operator_program",
+                "role": "valid_operator",
+                "validation_score": 0.86
+              },
+              "producer": "hps_fixture_alpha",
+              "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+              "uses_test_signal": false
+            },
+            "module_name": "orchestrator_core.schemas.CandidateArtifact",
+            "node_id": "artifact:op_valid_seed42_g0",
+            "node_type": "artifact",
+            "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+          },
+          "downstream_nodes": [
+            {
+              "capabilities": [
+                "problem_space_lineage"
+              ],
+              "metadata": {
+                "version_id": "v0"
+              },
+              "module_name": "eie_core.ProblemSpaceVersion",
+              "node_id": "problem_space_version:v0",
+              "node_type": "problem_space_version",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ],
+          "incoming_edges": [
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "produces:hps_fixture_alpha:op_valid_seed42_g0",
+              "edge_type": "produces",
+              "metadata": {
+                "generation": 0
+              },
+              "source_node_id": "hps_fixture_alpha",
+              "target_node_id": "artifact:op_valid_seed42_g0"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "stores:op_valid_seed42_g0:decision:op_valid_seed42_g0",
+              "edge_type": "stores",
+              "metadata": {
+                "accepted": true
+              },
+              "source_node_id": "structural_memory",
+              "target_node_id": "artifact:op_valid_seed42_g0"
+            }
+          ],
+          "outgoing_edges": [
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "accepts:op_valid_seed42_g0:v0",
+              "edge_type": "accepts",
+              "metadata": {
+                "decision_id": "decision:op_valid_seed42_g0"
+              },
+              "source_node_id": "artifact:op_valid_seed42_g0",
+              "target_node_id": "problem_space_version:v0"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "evaluates:op_valid_seed42_g0:hidden_validation:1",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": true,
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:op_valid_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "evaluates:op_valid_seed42_g0:validation:0",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": true,
+                "split": "validation"
+              },
+              "source_node_id": "artifact:op_valid_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            }
+          ],
+          "upstream_nodes": [
+            {
+              "capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "metadata": {
+                "seed": 42
+              },
+              "module_name": "orchestrator_core.adapters.HybridProgramSynthesisAdapter",
+              "node_id": "hps_fixture_alpha",
+              "node_type": "candidate_generator",
+              "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ]
+        },
+        "problem_space_version_id": "v0",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "accepted",
+        "residue_ids": []
+      },
+      {
+        "accepted": false,
+        "artifact_id": "op_invalid_seed42_g0",
+        "artifact_type": "operator_program",
+        "decision_id": "decision:op_invalid_seed42_g0",
+        "lineage": {
+          "artifact_id": "op_invalid_seed42_g0",
+          "artifact_node": {
+            "capabilities": [
+              "operator_program",
+              "deterministic_fixture"
+            ],
+            "metadata": {
+              "artifact_id": "op_invalid_seed42_g0",
+              "artifact_type": "operator_program",
+              "created_generation": 0,
+              "declared_capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "payload": {
+                "control_kind": "candidate",
+                "hidden_validation_score": 0.36,
+                "program_family": "operator_program",
+                "role": "invalid_operator",
+                "validation_score": 0.42
+              },
+              "producer": "hps_fixture_alpha",
+              "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+              "uses_test_signal": false
+            },
+            "module_name": "orchestrator_core.schemas.CandidateArtifact",
+            "node_id": "artifact:op_invalid_seed42_g0",
+            "node_type": "artifact",
+            "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+          },
+          "downstream_nodes": [
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "failure_residue"
+              ],
+              "metadata": {
+                "evidence": {
+                  "artifact_id": "op_invalid_seed42_g0",
+                  "artifact_type": "operator_program",
+                  "blind_spot": "artifact_failure_pattern",
+                  "control": "",
+                  "control_kind": "candidate",
+                  "min_diversity": 3,
+                  "missing_signal": "artifact_failure_probe",
+                  "penalty": "validation_to_hidden_gap",
+                  "primitive": "candidate_operator",
+                  "producer": "hps_fixture_alpha",
+                  "rejection_reason": "invalid_operator_hidden_validation_failure",
+                  "role": "invalid_operator",
+                  "score": 0.36,
+                  "threshold": 0.66
+                },
+                "failure_type": "invalid_operator_hidden_validation_failure",
+                "generation": 0,
+                "residue_id": "residue:op_invalid_seed42_g0:hidden_validation:1",
+                "severity": 0.55,
+                "source": "orchestrator:eie_evaluator",
+                "split": "hidden_validation",
+                "suspected_instrument": "operator_generator:orch_opgen0"
+              },
+              "module_name": "eie_core.FailureResidue",
+              "node_id": "failure_residue:residue:op_invalid_seed42_g0:hidden_validation:1",
+              "node_type": "failure_residue",
+              "repo_name": null
+            },
+            {
+              "capabilities": [
+                "failure_residue"
+              ],
+              "metadata": {
+                "evidence": {
+                  "artifact_id": "op_invalid_seed42_g0",
+                  "artifact_type": "operator_program",
+                  "blind_spot": "artifact_failure_pattern",
+                  "control": "",
+                  "control_kind": "candidate",
+                  "min_diversity": 3,
+                  "missing_signal": "artifact_failure_probe",
+                  "penalty": "validation_to_hidden_gap",
+                  "primitive": "candidate_operator",
+                  "producer": "hps_fixture_alpha",
+                  "rejection_reason": "invalid_operator_validation_failure",
+                  "role": "invalid_operator",
+                  "score": 0.42,
+                  "threshold": 0.7
+                },
+                "failure_type": "invalid_operator_validation_failure",
+                "generation": 0,
+                "residue_id": "residue:op_invalid_seed42_g0:validation:0",
+                "severity": 0.53,
+                "source": "orchestrator:eie_evaluator",
+                "split": "validation",
+                "suspected_instrument": "operator_generator:orch_opgen0"
+              },
+              "module_name": "eie_core.FailureResidue",
+              "node_id": "failure_residue:residue:op_invalid_seed42_g0:validation:0",
+              "node_type": "failure_residue",
+              "repo_name": null
+            }
+          ],
+          "incoming_edges": [
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "produces:hps_fixture_alpha:op_invalid_seed42_g0",
+              "edge_type": "produces",
+              "metadata": {
+                "generation": 0
+              },
+              "source_node_id": "hps_fixture_alpha",
+              "target_node_id": "artifact:op_invalid_seed42_g0"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "stores:op_invalid_seed42_g0:decision:op_invalid_seed42_g0",
+              "edge_type": "stores",
+              "metadata": {
+                "accepted": false
+              },
+              "source_node_id": "structural_memory",
+              "target_node_id": "artifact:op_invalid_seed42_g0"
+            }
+          ],
+          "outgoing_edges": [
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "evaluates:op_invalid_seed42_g0:hidden_validation:1",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": false,
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:op_invalid_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "evaluates:op_invalid_seed42_g0:validation:0",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": false,
+                "split": "validation"
+              },
+              "source_node_id": "artifact:op_invalid_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "rejects:op_invalid_seed42_g0:decision:op_invalid_seed42_g0",
+              "edge_type": "rejects",
+              "metadata": {
+                "rejection_reason": "invalid_operator_validation_failure"
+              },
+              "source_node_id": "artifact:op_invalid_seed42_g0",
+              "target_node_id": "structural_memory"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "residue:op_invalid_seed42_g0:residue:op_invalid_seed42_g0:hidden_validation:1",
+              "edge_type": "produces",
+              "metadata": {
+                "failure_type": "invalid_operator_hidden_validation_failure",
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:op_invalid_seed42_g0",
+              "target_node_id": "failure_residue:residue:op_invalid_seed42_g0:hidden_validation:1"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "residue:op_invalid_seed42_g0:residue:op_invalid_seed42_g0:validation:0",
+              "edge_type": "produces",
+              "metadata": {
+                "failure_type": "invalid_operator_validation_failure",
+                "split": "validation"
+              },
+              "source_node_id": "artifact:op_invalid_seed42_g0",
+              "target_node_id": "failure_residue:residue:op_invalid_seed42_g0:validation:0"
+            }
+          ],
+          "upstream_nodes": [
+            {
+              "capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "metadata": {
+                "seed": 42
+              },
+              "module_name": "orchestrator_core.adapters.HybridProgramSynthesisAdapter",
+              "node_id": "hps_fixture_alpha",
+              "node_type": "candidate_generator",
+              "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ]
+        },
+        "problem_space_version_id": "v0",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "invalid_operator_validation_failure",
+        "residue_ids": [
+          "residue:op_invalid_seed42_g0:validation:0",
+          "residue:op_invalid_seed42_g0:hidden_validation:1"
+        ]
+      },
+      {
+        "accepted": true,
+        "artifact_id": "primitive_valid_seed42_g0",
+        "artifact_type": "primitive_candidate",
+        "decision_id": "decision:primitive_valid_seed42_g0",
+        "lineage": {
+          "artifact_id": "primitive_valid_seed42_g0",
+          "artifact_node": {
+            "capabilities": [
+              "primitive_candidate",
+              "deterministic_fixture"
+            ],
+            "metadata": {
+              "artifact_id": "primitive_valid_seed42_g0",
+              "artifact_type": "primitive_candidate",
+              "created_generation": 0,
+              "declared_capabilities": [
+                "primitive_candidate",
+                "deterministic_fixture"
+              ],
+              "payload": {
+                "control_kind": "candidate",
+                "hidden_validation_score": 0.73,
+                "program_family": "primitive_candidate",
+                "role": "valid_primitive",
+                "validation_score": 0.78
+              },
+              "producer": "hps_fixture_alpha",
+              "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+              "uses_test_signal": false
+            },
+            "module_name": "orchestrator_core.schemas.CandidateArtifact",
+            "node_id": "artifact:primitive_valid_seed42_g0",
+            "node_type": "artifact",
+            "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+          },
+          "downstream_nodes": [
+            {
+              "capabilities": [
+                "problem_space_lineage"
+              ],
+              "metadata": {
+                "version_id": "v0"
+              },
+              "module_name": "eie_core.ProblemSpaceVersion",
+              "node_id": "problem_space_version:v0",
+              "node_type": "problem_space_version",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ],
+          "incoming_edges": [
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "produces:hps_fixture_alpha:primitive_valid_seed42_g0",
+              "edge_type": "produces",
+              "metadata": {
+                "generation": 0
+              },
+              "source_node_id": "hps_fixture_alpha",
+              "target_node_id": "artifact:primitive_valid_seed42_g0"
+            },
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "stores:primitive_valid_seed42_g0:decision:primitive_valid_seed42_g0",
+              "edge_type": "stores",
+              "metadata": {
+                "accepted": true
+              },
+              "source_node_id": "structural_memory",
+              "target_node_id": "artifact:primitive_valid_seed42_g0"
+            }
+          ],
+          "outgoing_edges": [
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "accepts:primitive_valid_seed42_g0:v0",
+              "edge_type": "accepts",
+              "metadata": {
+                "decision_id": "decision:primitive_valid_seed42_g0"
+              },
+              "source_node_id": "artifact:primitive_valid_seed42_g0",
+              "target_node_id": "problem_space_version:v0"
+            },
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "evaluates:primitive_valid_seed42_g0:hidden_validation:1",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": true,
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:primitive_valid_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "evaluates:primitive_valid_seed42_g0:validation:0",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": true,
+                "split": "validation"
+              },
+              "source_node_id": "artifact:primitive_valid_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            }
+          ],
+          "upstream_nodes": [
+            {
+              "capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "metadata": {
+                "seed": 42
+              },
+              "module_name": "orchestrator_core.adapters.HybridProgramSynthesisAdapter",
+              "node_id": "hps_fixture_alpha",
+              "node_type": "candidate_generator",
+              "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ]
+        },
+        "problem_space_version_id": "v0",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "accepted",
+        "residue_ids": []
+      },
+      {
+        "accepted": false,
+        "artifact_id": "op_test_signal_seed42_g0",
+        "artifact_type": "operator_program",
+        "decision_id": "decision:op_test_signal_seed42_g0",
+        "lineage": {
+          "artifact_id": "op_test_signal_seed42_g0",
+          "artifact_node": {
+            "capabilities": [
+              "operator_program",
+              "deterministic_fixture"
+            ],
+            "metadata": {
+              "artifact_id": "op_test_signal_seed42_g0",
+              "artifact_type": "operator_program",
+              "created_generation": 0,
+              "declared_capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "payload": {
+                "control_kind": "candidate",
+                "hidden_validation_score": 0.89,
+                "program_family": "operator_program",
+                "role": "test_signal_trap",
+                "validation_score": 0.91
+              },
+              "producer": "hps_fixture_alpha",
+              "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+              "uses_test_signal": true
+            },
+            "module_name": "orchestrator_core.schemas.CandidateArtifact",
+            "node_id": "artifact:op_test_signal_seed42_g0",
+            "node_type": "artifact",
+            "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+          },
+          "downstream_nodes": [
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ],
+          "incoming_edges": [
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "produces:hps_fixture_alpha:op_test_signal_seed42_g0",
+              "edge_type": "produces",
+              "metadata": {
+                "generation": 0
+              },
+              "source_node_id": "hps_fixture_alpha",
+              "target_node_id": "artifact:op_test_signal_seed42_g0"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "stores:op_test_signal_seed42_g0:decision:op_test_signal_seed42_g0",
+              "edge_type": "stores",
+              "metadata": {
+                "accepted": false
+              },
+              "source_node_id": "structural_memory",
+              "target_node_id": "artifact:op_test_signal_seed42_g0"
+            }
+          ],
+          "outgoing_edges": [
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "evaluates:op_test_signal_seed42_g0:hidden_validation:1",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": false,
+                "passed": true,
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:op_test_signal_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "evaluates:op_test_signal_seed42_g0:validation:0",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": false,
+                "passed": true,
+                "split": "validation"
+              },
+              "source_node_id": "artifact:op_test_signal_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "rejects:op_test_signal_seed42_g0:decision:op_test_signal_seed42_g0",
+              "edge_type": "rejects",
+              "metadata": {
+                "rejection_reason": "artifact_uses_test_signal"
+              },
+              "source_node_id": "artifact:op_test_signal_seed42_g0",
+              "target_node_id": "structural_memory"
+            }
+          ],
+          "upstream_nodes": [
+            {
+              "capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "metadata": {
+                "seed": 42
+              },
+              "module_name": "orchestrator_core.adapters.HybridProgramSynthesisAdapter",
+              "node_id": "hps_fixture_alpha",
+              "node_type": "candidate_generator",
+              "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ]
+        },
+        "problem_space_version_id": "v0",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "artifact_uses_test_signal",
+        "residue_ids": []
+      },
+      {
+        "accepted": false,
+        "artifact_id": "noop_control_seed42_g0",
+        "artifact_type": "operator_program",
+        "decision_id": "decision:noop_control_seed42_g0",
+        "lineage": {
+          "artifact_id": "noop_control_seed42_g0",
+          "artifact_node": {
+            "capabilities": [
+              "operator_program",
+              "deterministic_fixture"
+            ],
+            "metadata": {
+              "artifact_id": "noop_control_seed42_g0",
+              "artifact_type": "operator_program",
+              "created_generation": 0,
+              "declared_capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "payload": {
+                "control_kind": "no_op",
+                "hidden_validation_score": 0.5,
+                "program_family": "operator_program",
+                "role": "no_op",
+                "validation_score": 0.5
+              },
+              "producer": "hps_fixture_alpha",
+              "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+              "uses_test_signal": false
+            },
+            "module_name": "orchestrator_core.schemas.CandidateArtifact",
+            "node_id": "artifact:noop_control_seed42_g0",
+            "node_type": "artifact",
+            "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+          },
+          "downstream_nodes": [
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "failure_residue"
+              ],
+              "metadata": {
+                "evidence": {
+                  "artifact_id": "noop_control_seed42_g0",
+                  "artifact_type": "operator_program",
+                  "blind_spot": "artifact_failure_pattern",
+                  "control": "no_op_control",
+                  "control_kind": "no_op",
+                  "min_diversity": 3,
+                  "missing_signal": "artifact_failure_probe",
+                  "penalty": "validation_to_hidden_gap",
+                  "primitive": "candidate_operator",
+                  "producer": "hps_fixture_alpha",
+                  "rejection_reason": "no_op_control_failure",
+                  "role": "no_op",
+                  "score": 0.5,
+                  "threshold": 0.66
+                },
+                "failure_type": "no_op_control_failure",
+                "generation": 0,
+                "residue_id": "residue:noop_control_seed42_g0:hidden_validation:1",
+                "severity": 0.41000000000000003,
+                "source": "orchestrator:eie_evaluator",
+                "split": "hidden_validation",
+                "suspected_instrument": "experiment_unit:orch_exp0"
+              },
+              "module_name": "eie_core.FailureResidue",
+              "node_id": "failure_residue:residue:noop_control_seed42_g0:hidden_validation:1",
+              "node_type": "failure_residue",
+              "repo_name": null
+            },
+            {
+              "capabilities": [
+                "failure_residue"
+              ],
+              "metadata": {
+                "evidence": {
+                  "artifact_id": "noop_control_seed42_g0",
+                  "artifact_type": "operator_program",
+                  "blind_spot": "artifact_failure_pattern",
+                  "control": "no_op_control",
+                  "control_kind": "no_op",
+                  "min_diversity": 3,
+                  "missing_signal": "artifact_failure_probe",
+                  "penalty": "validation_to_hidden_gap",
+                  "primitive": "candidate_operator",
+                  "producer": "hps_fixture_alpha",
+                  "rejection_reason": "no_op_control_failure",
+                  "role": "no_op",
+                  "score": 0.5,
+                  "threshold": 0.7
+                },
+                "failure_type": "no_op_control_failure",
+                "generation": 0,
+                "residue_id": "residue:noop_control_seed42_g0:validation:0",
+                "severity": 0.44999999999999996,
+                "source": "orchestrator:eie_evaluator",
+                "split": "validation",
+                "suspected_instrument": "experiment_unit:orch_exp0"
+              },
+              "module_name": "eie_core.FailureResidue",
+              "node_id": "failure_residue:residue:noop_control_seed42_g0:validation:0",
+              "node_type": "failure_residue",
+              "repo_name": null
+            }
+          ],
+          "incoming_edges": [
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "produces:hps_fixture_alpha:noop_control_seed42_g0",
+              "edge_type": "produces",
+              "metadata": {
+                "generation": 0
+              },
+              "source_node_id": "hps_fixture_alpha",
+              "target_node_id": "artifact:noop_control_seed42_g0"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "stores:noop_control_seed42_g0:decision:noop_control_seed42_g0",
+              "edge_type": "stores",
+              "metadata": {
+                "accepted": false
+              },
+              "source_node_id": "structural_memory",
+              "target_node_id": "artifact:noop_control_seed42_g0"
+            }
+          ],
+          "outgoing_edges": [
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "evaluates:noop_control_seed42_g0:hidden_validation:1",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": false,
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:noop_control_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "evaluates:noop_control_seed42_g0:validation:0",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": false,
+                "split": "validation"
+              },
+              "source_node_id": "artifact:noop_control_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "rejects:noop_control_seed42_g0:decision:noop_control_seed42_g0",
+              "edge_type": "rejects",
+              "metadata": {
+                "rejection_reason": "no_op_control_failure"
+              },
+              "source_node_id": "artifact:noop_control_seed42_g0",
+              "target_node_id": "structural_memory"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "residue:noop_control_seed42_g0:residue:noop_control_seed42_g0:hidden_validation:1",
+              "edge_type": "produces",
+              "metadata": {
+                "failure_type": "no_op_control_failure",
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:noop_control_seed42_g0",
+              "target_node_id": "failure_residue:residue:noop_control_seed42_g0:hidden_validation:1"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "residue:noop_control_seed42_g0:residue:noop_control_seed42_g0:validation:0",
+              "edge_type": "produces",
+              "metadata": {
+                "failure_type": "no_op_control_failure",
+                "split": "validation"
+              },
+              "source_node_id": "artifact:noop_control_seed42_g0",
+              "target_node_id": "failure_residue:residue:noop_control_seed42_g0:validation:0"
+            }
+          ],
+          "upstream_nodes": [
+            {
+              "capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "metadata": {
+                "seed": 42
+              },
+              "module_name": "orchestrator_core.adapters.HybridProgramSynthesisAdapter",
+              "node_id": "hps_fixture_alpha",
+              "node_type": "candidate_generator",
+              "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ]
+        },
+        "problem_space_version_id": "v0",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "no_op_control_failure",
+        "residue_ids": [
+          "residue:noop_control_seed42_g0:validation:0",
+          "residue:noop_control_seed42_g0:hidden_validation:1"
+        ]
+      },
+      {
+        "accepted": false,
+        "artifact_id": "random_control_seed42_g0",
+        "artifact_type": "primitive_candidate",
+        "decision_id": "decision:random_control_seed42_g0",
+        "lineage": {
+          "artifact_id": "random_control_seed42_g0",
+          "artifact_node": {
+            "capabilities": [
+              "primitive_candidate",
+              "deterministic_fixture"
+            ],
+            "metadata": {
+              "artifact_id": "random_control_seed42_g0",
+              "artifact_type": "primitive_candidate",
+              "created_generation": 0,
+              "declared_capabilities": [
+                "primitive_candidate",
+                "deterministic_fixture"
+              ],
+              "payload": {
+                "control_kind": "random",
+                "hidden_validation_score": 0.47050021510445333,
+                "program_family": "primitive_candidate",
+                "role": "random",
+                "validation_score": 0.49278853596915767
+              },
+              "producer": "hps_fixture_alpha",
+              "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+              "uses_test_signal": false
+            },
+            "module_name": "orchestrator_core.schemas.CandidateArtifact",
+            "node_id": "artifact:random_control_seed42_g0",
+            "node_type": "artifact",
+            "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+          },
+          "downstream_nodes": [
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "failure_residue"
+              ],
+              "metadata": {
+                "evidence": {
+                  "artifact_id": "random_control_seed42_g0",
+                  "artifact_type": "primitive_candidate",
+                  "blind_spot": "artifact_failure_pattern",
+                  "control": "random_control",
+                  "control_kind": "random",
+                  "min_diversity": 3,
+                  "missing_signal": "artifact_failure_probe",
+                  "penalty": "validation_to_hidden_gap",
+                  "primitive": "unstable_primitive",
+                  "producer": "hps_fixture_alpha",
+                  "rejection_reason": "random_control_failure",
+                  "role": "random",
+                  "score": 0.47050021510445333,
+                  "threshold": 0.66
+                },
+                "failure_type": "random_control_failure",
+                "generation": 0,
+                "residue_id": "residue:random_control_seed42_g0:hidden_validation:1",
+                "severity": 0.4394997848955467,
+                "source": "orchestrator:eie_evaluator",
+                "split": "hidden_validation",
+                "suspected_instrument": "operator_generator:orch_opgen0"
+              },
+              "module_name": "eie_core.FailureResidue",
+              "node_id": "failure_residue:residue:random_control_seed42_g0:hidden_validation:1",
+              "node_type": "failure_residue",
+              "repo_name": null
+            },
+            {
+              "capabilities": [
+                "failure_residue"
+              ],
+              "metadata": {
+                "evidence": {
+                  "artifact_id": "random_control_seed42_g0",
+                  "artifact_type": "primitive_candidate",
+                  "blind_spot": "artifact_failure_pattern",
+                  "control": "random_control",
+                  "control_kind": "random",
+                  "min_diversity": 3,
+                  "missing_signal": "artifact_failure_probe",
+                  "penalty": "validation_to_hidden_gap",
+                  "primitive": "unstable_primitive",
+                  "producer": "hps_fixture_alpha",
+                  "rejection_reason": "random_control_failure",
+                  "role": "random",
+                  "score": 0.49278853596915767,
+                  "threshold": 0.7
+                },
+                "failure_type": "random_control_failure",
+                "generation": 0,
+                "residue_id": "residue:random_control_seed42_g0:validation:0",
+                "severity": 0.4572114640308423,
+                "source": "orchestrator:eie_evaluator",
+                "split": "validation",
+                "suspected_instrument": "operator_generator:orch_opgen0"
+              },
+              "module_name": "eie_core.FailureResidue",
+              "node_id": "failure_residue:residue:random_control_seed42_g0:validation:0",
+              "node_type": "failure_residue",
+              "repo_name": null
+            }
+          ],
+          "incoming_edges": [
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "produces:hps_fixture_alpha:random_control_seed42_g0",
+              "edge_type": "produces",
+              "metadata": {
+                "generation": 0
+              },
+              "source_node_id": "hps_fixture_alpha",
+              "target_node_id": "artifact:random_control_seed42_g0"
+            },
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "stores:random_control_seed42_g0:decision:random_control_seed42_g0",
+              "edge_type": "stores",
+              "metadata": {
+                "accepted": false
+              },
+              "source_node_id": "structural_memory",
+              "target_node_id": "artifact:random_control_seed42_g0"
+            }
+          ],
+          "outgoing_edges": [
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "evaluates:random_control_seed42_g0:hidden_validation:1",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": false,
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:random_control_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "evaluates:random_control_seed42_g0:validation:0",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": false,
+                "split": "validation"
+              },
+              "source_node_id": "artifact:random_control_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "rejects:random_control_seed42_g0:decision:random_control_seed42_g0",
+              "edge_type": "rejects",
+              "metadata": {
+                "rejection_reason": "random_control_failure"
+              },
+              "source_node_id": "artifact:random_control_seed42_g0",
+              "target_node_id": "structural_memory"
+            },
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "residue:random_control_seed42_g0:residue:random_control_seed42_g0:hidden_validation:1",
+              "edge_type": "produces",
+              "metadata": {
+                "failure_type": "random_control_failure",
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:random_control_seed42_g0",
+              "target_node_id": "failure_residue:residue:random_control_seed42_g0:hidden_validation:1"
+            },
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "residue:random_control_seed42_g0:residue:random_control_seed42_g0:validation:0",
+              "edge_type": "produces",
+              "metadata": {
+                "failure_type": "random_control_failure",
+                "split": "validation"
+              },
+              "source_node_id": "artifact:random_control_seed42_g0",
+              "target_node_id": "failure_residue:residue:random_control_seed42_g0:validation:0"
+            }
+          ],
+          "upstream_nodes": [
+            {
+              "capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "metadata": {
+                "seed": 42
+              },
+              "module_name": "orchestrator_core.adapters.HybridProgramSynthesisAdapter",
+              "node_id": "hps_fixture_alpha",
+              "node_type": "candidate_generator",
+              "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ]
+        },
+        "problem_space_version_id": "v0",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "random_control_failure",
+        "residue_ids": [
+          "residue:random_control_seed42_g0:validation:0",
+          "residue:random_control_seed42_g0:hidden_validation:1"
+        ]
+      }
+    ],
+    "eie_mutation_decisions": [
+      {
+        "accepted": false,
+        "accepted_on_splits": [],
+        "after_pressure": {
+          "by_instrument": {
+            "operator_generator:orch_opgen0": 1.08
+          },
+          "by_split": {
+            "hidden_validation": 0.55,
+            "validation": 0.53
+          },
+          "residue_count": 2,
+          "total_pressure": 1.08
+        },
+        "before_pressure": {
+          "by_instrument": {
+            "operator_generator:orch_opgen0": 1.08
+          },
+          "by_split": {
+            "hidden_validation": 0.55,
+            "validation": 0.53
+          },
+          "residue_count": 2,
+          "total_pressure": 1.08
+        },
+        "contract": {
+          "contract_id": "contract_g0_0_operator_generator_orch_opgen0",
+          "created_generation": 0,
+          "expected_residue_reduction": 0.27,
+          "mutation_payload": {
+            "action": "expand_primitive_diversity",
+            "primitive": "candidate_operator"
+          },
+          "reason": "highest unresolved pressure is 1.080000 on operator_generator:orch_opgen0",
+          "target_instrument_id": "orch_opgen0",
+          "target_instrument_type": "operator_generator",
+          "uses_test_signal": false
+        },
+        "contract_id": "contract_g0_0_operator_generator_orch_opgen0",
+        "generation": 0,
+        "lineage_recorded": false,
+        "pressure_delta": 0.0,
+        "rejection_reason": "residue_pressure_not_reduced",
+        "rollback": true,
+        "used_test_signal_for_acceptance": false,
+        "validation_only": true
+      },
+      {
+        "accepted": false,
+        "accepted_on_splits": [],
+        "after_pressure": {
+          "by_instrument": {
+            "experiment_unit:orch_exp0": 0.387,
+            "operator_generator:orch_opgen0": 1.08
+          },
+          "by_split": {
+            "hidden_validation": 0.7345,
+            "validation": 0.7325
+          },
+          "residue_count": 4,
+          "total_pressure": 1.467
+        },
+        "before_pressure": {
+          "by_instrument": {
+            "experiment_unit:orch_exp0": 0.387,
+            "operator_generator:orch_opgen0": 1.08
+          },
+          "by_split": {
+            "hidden_validation": 0.7345,
+            "validation": 0.7325
+          },
+          "residue_count": 4,
+          "total_pressure": 1.467
+        },
+        "contract": {
+          "contract_id": "contract_g0_1_operator_generator_orch_opgen0",
+          "created_generation": 0,
+          "expected_residue_reduction": 0.27,
+          "mutation_payload": {
+            "action": "expand_primitive_diversity",
+            "primitive": "candidate_operator"
+          },
+          "reason": "highest unresolved pressure is 1.080000 on operator_generator:orch_opgen0",
+          "target_instrument_id": "orch_opgen0",
+          "target_instrument_type": "operator_generator",
+          "uses_test_signal": false
+        },
+        "contract_id": "contract_g0_1_operator_generator_orch_opgen0",
+        "generation": 0,
+        "lineage_recorded": false,
+        "pressure_delta": 0.0,
+        "rejection_reason": "residue_pressure_not_reduced",
+        "rollback": true,
+        "used_test_signal_for_acceptance": false,
+        "validation_only": true
+      },
+      {
+        "accepted": false,
+        "accepted_on_splits": [],
+        "after_pressure": {
+          "by_instrument": {
+            "experiment_unit:orch_exp0": 0.387,
+            "operator_generator:orch_opgen0": 1.976711248926389
+          },
+          "by_split": {
+            "hidden_validation": 1.1739997848955468,
+            "validation": 1.1897114640308424
+          },
+          "residue_count": 6,
+          "total_pressure": 2.363711248926389
+        },
+        "before_pressure": {
+          "by_instrument": {
+            "experiment_unit:orch_exp0": 0.387,
+            "operator_generator:orch_opgen0": 1.976711248926389
+          },
+          "by_split": {
+            "hidden_validation": 1.1739997848955468,
+            "validation": 1.1897114640308424
+          },
+          "residue_count": 6,
+          "total_pressure": 2.363711248926389
+        },
+        "contract": {
+          "contract_id": "contract_g0_2_operator_generator_orch_opgen0",
+          "created_generation": 0,
+          "expected_residue_reduction": 0.49417781223159724,
+          "mutation_payload": {
+            "action": "expand_primitive_diversity",
+            "primitive": "candidate_operator"
+          },
+          "reason": "highest unresolved pressure is 1.976711 on operator_generator:orch_opgen0",
+          "target_instrument_id": "orch_opgen0",
+          "target_instrument_type": "operator_generator",
+          "uses_test_signal": false
+        },
+        "contract_id": "contract_g0_2_operator_generator_orch_opgen0",
+        "generation": 0,
+        "lineage_recorded": false,
+        "pressure_delta": 0.0,
+        "rejection_reason": "residue_pressure_not_reduced",
+        "rollback": true,
+        "used_test_signal_for_acceptance": false,
+        "validation_only": true
+      }
+    ],
+    "failure_residues": [
+      {
+        "evidence": {
+          "artifact_id": "op_invalid_seed42_g0",
+          "artifact_type": "operator_program",
+          "blind_spot": "artifact_failure_pattern",
+          "control": "",
+          "control_kind": "candidate",
+          "min_diversity": 3,
+          "missing_signal": "artifact_failure_probe",
+          "penalty": "validation_to_hidden_gap",
+          "primitive": "candidate_operator",
+          "producer": "hps_fixture_alpha",
+          "rejection_reason": "invalid_operator_validation_failure",
+          "role": "invalid_operator",
+          "score": 0.42,
+          "threshold": 0.7
+        },
+        "failure_type": "invalid_operator_validation_failure",
+        "generation": 0,
+        "residue_id": "residue:op_invalid_seed42_g0:validation:0",
+        "severity": 0.53,
+        "source": "orchestrator:eie_evaluator",
+        "split": "validation",
+        "suspected_instrument": "operator_generator:orch_opgen0"
+      },
+      {
+        "evidence": {
+          "artifact_id": "op_invalid_seed42_g0",
+          "artifact_type": "operator_program",
+          "blind_spot": "artifact_failure_pattern",
+          "control": "",
+          "control_kind": "candidate",
+          "min_diversity": 3,
+          "missing_signal": "artifact_failure_probe",
+          "penalty": "validation_to_hidden_gap",
+          "primitive": "candidate_operator",
+          "producer": "hps_fixture_alpha",
+          "rejection_reason": "invalid_operator_hidden_validation_failure",
+          "role": "invalid_operator",
+          "score": 0.36,
+          "threshold": 0.66
+        },
+        "failure_type": "invalid_operator_hidden_validation_failure",
+        "generation": 0,
+        "residue_id": "residue:op_invalid_seed42_g0:hidden_validation:1",
+        "severity": 0.55,
+        "source": "orchestrator:eie_evaluator",
+        "split": "hidden_validation",
+        "suspected_instrument": "operator_generator:orch_opgen0"
+      },
+      {
+        "evidence": {
+          "artifact_id": "noop_control_seed42_g0",
+          "artifact_type": "operator_program",
+          "blind_spot": "artifact_failure_pattern",
+          "control": "no_op_control",
+          "control_kind": "no_op",
+          "min_diversity": 3,
+          "missing_signal": "artifact_failure_probe",
+          "penalty": "validation_to_hidden_gap",
+          "primitive": "candidate_operator",
+          "producer": "hps_fixture_alpha",
+          "rejection_reason": "no_op_control_failure",
+          "role": "no_op",
+          "score": 0.5,
+          "threshold": 0.7
+        },
+        "failure_type": "no_op_control_failure",
+        "generation": 0,
+        "residue_id": "residue:noop_control_seed42_g0:validation:0",
+        "severity": 0.44999999999999996,
+        "source": "orchestrator:eie_evaluator",
+        "split": "validation",
+        "suspected_instrument": "experiment_unit:orch_exp0"
+      },
+      {
+        "evidence": {
+          "artifact_id": "noop_control_seed42_g0",
+          "artifact_type": "operator_program",
+          "blind_spot": "artifact_failure_pattern",
+          "control": "no_op_control",
+          "control_kind": "no_op",
+          "min_diversity": 3,
+          "missing_signal": "artifact_failure_probe",
+          "penalty": "validation_to_hidden_gap",
+          "primitive": "candidate_operator",
+          "producer": "hps_fixture_alpha",
+          "rejection_reason": "no_op_control_failure",
+          "role": "no_op",
+          "score": 0.5,
+          "threshold": 0.66
+        },
+        "failure_type": "no_op_control_failure",
+        "generation": 0,
+        "residue_id": "residue:noop_control_seed42_g0:hidden_validation:1",
+        "severity": 0.41000000000000003,
+        "source": "orchestrator:eie_evaluator",
+        "split": "hidden_validation",
+        "suspected_instrument": "experiment_unit:orch_exp0"
+      },
+      {
+        "evidence": {
+          "artifact_id": "random_control_seed42_g0",
+          "artifact_type": "primitive_candidate",
+          "blind_spot": "artifact_failure_pattern",
+          "control": "random_control",
+          "control_kind": "random",
+          "min_diversity": 3,
+          "missing_signal": "artifact_failure_probe",
+          "penalty": "validation_to_hidden_gap",
+          "primitive": "unstable_primitive",
+          "producer": "hps_fixture_alpha",
+          "rejection_reason": "random_control_failure",
+          "role": "random",
+          "score": 0.49278853596915767,
+          "threshold": 0.7
+        },
+        "failure_type": "random_control_failure",
+        "generation": 0,
+        "residue_id": "residue:random_control_seed42_g0:validation:0",
+        "severity": 0.4572114640308423,
+        "source": "orchestrator:eie_evaluator",
+        "split": "validation",
+        "suspected_instrument": "operator_generator:orch_opgen0"
+      },
+      {
+        "evidence": {
+          "artifact_id": "random_control_seed42_g0",
+          "artifact_type": "primitive_candidate",
+          "blind_spot": "artifact_failure_pattern",
+          "control": "random_control",
+          "control_kind": "random",
+          "min_diversity": 3,
+          "missing_signal": "artifact_failure_probe",
+          "penalty": "validation_to_hidden_gap",
+          "primitive": "unstable_primitive",
+          "producer": "hps_fixture_alpha",
+          "rejection_reason": "random_control_failure",
+          "role": "random",
+          "score": 0.47050021510445333,
+          "threshold": 0.66
+        },
+        "failure_type": "random_control_failure",
+        "generation": 0,
+        "residue_id": "residue:random_control_seed42_g0:hidden_validation:1",
+        "severity": 0.4394997848955467,
+        "source": "orchestrator:eie_evaluator",
+        "split": "hidden_validation",
+        "suspected_instrument": "operator_generator:orch_opgen0"
+      }
+    ],
+    "record_count": 15,
+    "rejected_lineage": [
+      {
+        "accepted": false,
+        "artifact_id": "op_invalid_seed42_g0",
+        "artifact_type": "operator_program",
+        "decision_id": "decision:op_invalid_seed42_g0",
+        "lineage": {
+          "artifact_id": "op_invalid_seed42_g0",
+          "artifact_node": {
+            "capabilities": [
+              "operator_program",
+              "deterministic_fixture"
+            ],
+            "metadata": {
+              "artifact_id": "op_invalid_seed42_g0",
+              "artifact_type": "operator_program",
+              "created_generation": 0,
+              "declared_capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "payload": {
+                "control_kind": "candidate",
+                "hidden_validation_score": 0.36,
+                "program_family": "operator_program",
+                "role": "invalid_operator",
+                "validation_score": 0.42
+              },
+              "producer": "hps_fixture_alpha",
+              "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+              "uses_test_signal": false
+            },
+            "module_name": "orchestrator_core.schemas.CandidateArtifact",
+            "node_id": "artifact:op_invalid_seed42_g0",
+            "node_type": "artifact",
+            "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+          },
+          "downstream_nodes": [
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "failure_residue"
+              ],
+              "metadata": {
+                "evidence": {
+                  "artifact_id": "op_invalid_seed42_g0",
+                  "artifact_type": "operator_program",
+                  "blind_spot": "artifact_failure_pattern",
+                  "control": "",
+                  "control_kind": "candidate",
+                  "min_diversity": 3,
+                  "missing_signal": "artifact_failure_probe",
+                  "penalty": "validation_to_hidden_gap",
+                  "primitive": "candidate_operator",
+                  "producer": "hps_fixture_alpha",
+                  "rejection_reason": "invalid_operator_hidden_validation_failure",
+                  "role": "invalid_operator",
+                  "score": 0.36,
+                  "threshold": 0.66
+                },
+                "failure_type": "invalid_operator_hidden_validation_failure",
+                "generation": 0,
+                "residue_id": "residue:op_invalid_seed42_g0:hidden_validation:1",
+                "severity": 0.55,
+                "source": "orchestrator:eie_evaluator",
+                "split": "hidden_validation",
+                "suspected_instrument": "operator_generator:orch_opgen0"
+              },
+              "module_name": "eie_core.FailureResidue",
+              "node_id": "failure_residue:residue:op_invalid_seed42_g0:hidden_validation:1",
+              "node_type": "failure_residue",
+              "repo_name": null
+            },
+            {
+              "capabilities": [
+                "failure_residue"
+              ],
+              "metadata": {
+                "evidence": {
+                  "artifact_id": "op_invalid_seed42_g0",
+                  "artifact_type": "operator_program",
+                  "blind_spot": "artifact_failure_pattern",
+                  "control": "",
+                  "control_kind": "candidate",
+                  "min_diversity": 3,
+                  "missing_signal": "artifact_failure_probe",
+                  "penalty": "validation_to_hidden_gap",
+                  "primitive": "candidate_operator",
+                  "producer": "hps_fixture_alpha",
+                  "rejection_reason": "invalid_operator_validation_failure",
+                  "role": "invalid_operator",
+                  "score": 0.42,
+                  "threshold": 0.7
+                },
+                "failure_type": "invalid_operator_validation_failure",
+                "generation": 0,
+                "residue_id": "residue:op_invalid_seed42_g0:validation:0",
+                "severity": 0.53,
+                "source": "orchestrator:eie_evaluator",
+                "split": "validation",
+                "suspected_instrument": "operator_generator:orch_opgen0"
+              },
+              "module_name": "eie_core.FailureResidue",
+              "node_id": "failure_residue:residue:op_invalid_seed42_g0:validation:0",
+              "node_type": "failure_residue",
+              "repo_name": null
+            }
+          ],
+          "incoming_edges": [
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "produces:hps_fixture_alpha:op_invalid_seed42_g0",
+              "edge_type": "produces",
+              "metadata": {
+                "generation": 0
+              },
+              "source_node_id": "hps_fixture_alpha",
+              "target_node_id": "artifact:op_invalid_seed42_g0"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "stores:op_invalid_seed42_g0:decision:op_invalid_seed42_g0",
+              "edge_type": "stores",
+              "metadata": {
+                "accepted": false
+              },
+              "source_node_id": "structural_memory",
+              "target_node_id": "artifact:op_invalid_seed42_g0"
+            }
+          ],
+          "outgoing_edges": [
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "evaluates:op_invalid_seed42_g0:hidden_validation:1",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": false,
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:op_invalid_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "evaluates:op_invalid_seed42_g0:validation:0",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": false,
+                "split": "validation"
+              },
+              "source_node_id": "artifact:op_invalid_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "rejects:op_invalid_seed42_g0:decision:op_invalid_seed42_g0",
+              "edge_type": "rejects",
+              "metadata": {
+                "rejection_reason": "invalid_operator_validation_failure"
+              },
+              "source_node_id": "artifact:op_invalid_seed42_g0",
+              "target_node_id": "structural_memory"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "residue:op_invalid_seed42_g0:residue:op_invalid_seed42_g0:hidden_validation:1",
+              "edge_type": "produces",
+              "metadata": {
+                "failure_type": "invalid_operator_hidden_validation_failure",
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:op_invalid_seed42_g0",
+              "target_node_id": "failure_residue:residue:op_invalid_seed42_g0:hidden_validation:1"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "residue:op_invalid_seed42_g0:residue:op_invalid_seed42_g0:validation:0",
+              "edge_type": "produces",
+              "metadata": {
+                "failure_type": "invalid_operator_validation_failure",
+                "split": "validation"
+              },
+              "source_node_id": "artifact:op_invalid_seed42_g0",
+              "target_node_id": "failure_residue:residue:op_invalid_seed42_g0:validation:0"
+            }
+          ],
+          "upstream_nodes": [
+            {
+              "capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "metadata": {
+                "seed": 42
+              },
+              "module_name": "orchestrator_core.adapters.HybridProgramSynthesisAdapter",
+              "node_id": "hps_fixture_alpha",
+              "node_type": "candidate_generator",
+              "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ]
+        },
+        "problem_space_version_id": "v0",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "invalid_operator_validation_failure",
+        "residue_ids": [
+          "residue:op_invalid_seed42_g0:validation:0",
+          "residue:op_invalid_seed42_g0:hidden_validation:1"
+        ]
+      },
+      {
+        "accepted": false,
+        "artifact_id": "op_test_signal_seed42_g0",
+        "artifact_type": "operator_program",
+        "decision_id": "decision:op_test_signal_seed42_g0",
+        "lineage": {
+          "artifact_id": "op_test_signal_seed42_g0",
+          "artifact_node": {
+            "capabilities": [
+              "operator_program",
+              "deterministic_fixture"
+            ],
+            "metadata": {
+              "artifact_id": "op_test_signal_seed42_g0",
+              "artifact_type": "operator_program",
+              "created_generation": 0,
+              "declared_capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "payload": {
+                "control_kind": "candidate",
+                "hidden_validation_score": 0.89,
+                "program_family": "operator_program",
+                "role": "test_signal_trap",
+                "validation_score": 0.91
+              },
+              "producer": "hps_fixture_alpha",
+              "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+              "uses_test_signal": true
+            },
+            "module_name": "orchestrator_core.schemas.CandidateArtifact",
+            "node_id": "artifact:op_test_signal_seed42_g0",
+            "node_type": "artifact",
+            "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+          },
+          "downstream_nodes": [
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ],
+          "incoming_edges": [
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "produces:hps_fixture_alpha:op_test_signal_seed42_g0",
+              "edge_type": "produces",
+              "metadata": {
+                "generation": 0
+              },
+              "source_node_id": "hps_fixture_alpha",
+              "target_node_id": "artifact:op_test_signal_seed42_g0"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "stores:op_test_signal_seed42_g0:decision:op_test_signal_seed42_g0",
+              "edge_type": "stores",
+              "metadata": {
+                "accepted": false
+              },
+              "source_node_id": "structural_memory",
+              "target_node_id": "artifact:op_test_signal_seed42_g0"
+            }
+          ],
+          "outgoing_edges": [
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "evaluates:op_test_signal_seed42_g0:hidden_validation:1",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": false,
+                "passed": true,
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:op_test_signal_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "evaluates:op_test_signal_seed42_g0:validation:0",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": false,
+                "passed": true,
+                "split": "validation"
+              },
+              "source_node_id": "artifact:op_test_signal_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "rejects:op_test_signal_seed42_g0:decision:op_test_signal_seed42_g0",
+              "edge_type": "rejects",
+              "metadata": {
+                "rejection_reason": "artifact_uses_test_signal"
+              },
+              "source_node_id": "artifact:op_test_signal_seed42_g0",
+              "target_node_id": "structural_memory"
+            }
+          ],
+          "upstream_nodes": [
+            {
+              "capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "metadata": {
+                "seed": 42
+              },
+              "module_name": "orchestrator_core.adapters.HybridProgramSynthesisAdapter",
+              "node_id": "hps_fixture_alpha",
+              "node_type": "candidate_generator",
+              "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ]
+        },
+        "problem_space_version_id": "v0",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "artifact_uses_test_signal",
+        "residue_ids": []
+      },
+      {
+        "accepted": false,
+        "artifact_id": "noop_control_seed42_g0",
+        "artifact_type": "operator_program",
+        "decision_id": "decision:noop_control_seed42_g0",
+        "lineage": {
+          "artifact_id": "noop_control_seed42_g0",
+          "artifact_node": {
+            "capabilities": [
+              "operator_program",
+              "deterministic_fixture"
+            ],
+            "metadata": {
+              "artifact_id": "noop_control_seed42_g0",
+              "artifact_type": "operator_program",
+              "created_generation": 0,
+              "declared_capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "payload": {
+                "control_kind": "no_op",
+                "hidden_validation_score": 0.5,
+                "program_family": "operator_program",
+                "role": "no_op",
+                "validation_score": 0.5
+              },
+              "producer": "hps_fixture_alpha",
+              "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+              "uses_test_signal": false
+            },
+            "module_name": "orchestrator_core.schemas.CandidateArtifact",
+            "node_id": "artifact:noop_control_seed42_g0",
+            "node_type": "artifact",
+            "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+          },
+          "downstream_nodes": [
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "failure_residue"
+              ],
+              "metadata": {
+                "evidence": {
+                  "artifact_id": "noop_control_seed42_g0",
+                  "artifact_type": "operator_program",
+                  "blind_spot": "artifact_failure_pattern",
+                  "control": "no_op_control",
+                  "control_kind": "no_op",
+                  "min_diversity": 3,
+                  "missing_signal": "artifact_failure_probe",
+                  "penalty": "validation_to_hidden_gap",
+                  "primitive": "candidate_operator",
+                  "producer": "hps_fixture_alpha",
+                  "rejection_reason": "no_op_control_failure",
+                  "role": "no_op",
+                  "score": 0.5,
+                  "threshold": 0.66
+                },
+                "failure_type": "no_op_control_failure",
+                "generation": 0,
+                "residue_id": "residue:noop_control_seed42_g0:hidden_validation:1",
+                "severity": 0.41000000000000003,
+                "source": "orchestrator:eie_evaluator",
+                "split": "hidden_validation",
+                "suspected_instrument": "experiment_unit:orch_exp0"
+              },
+              "module_name": "eie_core.FailureResidue",
+              "node_id": "failure_residue:residue:noop_control_seed42_g0:hidden_validation:1",
+              "node_type": "failure_residue",
+              "repo_name": null
+            },
+            {
+              "capabilities": [
+                "failure_residue"
+              ],
+              "metadata": {
+                "evidence": {
+                  "artifact_id": "noop_control_seed42_g0",
+                  "artifact_type": "operator_program",
+                  "blind_spot": "artifact_failure_pattern",
+                  "control": "no_op_control",
+                  "control_kind": "no_op",
+                  "min_diversity": 3,
+                  "missing_signal": "artifact_failure_probe",
+                  "penalty": "validation_to_hidden_gap",
+                  "primitive": "candidate_operator",
+                  "producer": "hps_fixture_alpha",
+                  "rejection_reason": "no_op_control_failure",
+                  "role": "no_op",
+                  "score": 0.5,
+                  "threshold": 0.7
+                },
+                "failure_type": "no_op_control_failure",
+                "generation": 0,
+                "residue_id": "residue:noop_control_seed42_g0:validation:0",
+                "severity": 0.44999999999999996,
+                "source": "orchestrator:eie_evaluator",
+                "split": "validation",
+                "suspected_instrument": "experiment_unit:orch_exp0"
+              },
+              "module_name": "eie_core.FailureResidue",
+              "node_id": "failure_residue:residue:noop_control_seed42_g0:validation:0",
+              "node_type": "failure_residue",
+              "repo_name": null
+            }
+          ],
+          "incoming_edges": [
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "produces:hps_fixture_alpha:noop_control_seed42_g0",
+              "edge_type": "produces",
+              "metadata": {
+                "generation": 0
+              },
+              "source_node_id": "hps_fixture_alpha",
+              "target_node_id": "artifact:noop_control_seed42_g0"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "stores:noop_control_seed42_g0:decision:noop_control_seed42_g0",
+              "edge_type": "stores",
+              "metadata": {
+                "accepted": false
+              },
+              "source_node_id": "structural_memory",
+              "target_node_id": "artifact:noop_control_seed42_g0"
+            }
+          ],
+          "outgoing_edges": [
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "evaluates:noop_control_seed42_g0:hidden_validation:1",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": false,
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:noop_control_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "evaluates:noop_control_seed42_g0:validation:0",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": false,
+                "split": "validation"
+              },
+              "source_node_id": "artifact:noop_control_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "rejects:noop_control_seed42_g0:decision:noop_control_seed42_g0",
+              "edge_type": "rejects",
+              "metadata": {
+                "rejection_reason": "no_op_control_failure"
+              },
+              "source_node_id": "artifact:noop_control_seed42_g0",
+              "target_node_id": "structural_memory"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "residue:noop_control_seed42_g0:residue:noop_control_seed42_g0:hidden_validation:1",
+              "edge_type": "produces",
+              "metadata": {
+                "failure_type": "no_op_control_failure",
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:noop_control_seed42_g0",
+              "target_node_id": "failure_residue:residue:noop_control_seed42_g0:hidden_validation:1"
+            },
+            {
+              "artifact_type": "operator_program",
+              "edge_id": "residue:noop_control_seed42_g0:residue:noop_control_seed42_g0:validation:0",
+              "edge_type": "produces",
+              "metadata": {
+                "failure_type": "no_op_control_failure",
+                "split": "validation"
+              },
+              "source_node_id": "artifact:noop_control_seed42_g0",
+              "target_node_id": "failure_residue:residue:noop_control_seed42_g0:validation:0"
+            }
+          ],
+          "upstream_nodes": [
+            {
+              "capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "metadata": {
+                "seed": 42
+              },
+              "module_name": "orchestrator_core.adapters.HybridProgramSynthesisAdapter",
+              "node_id": "hps_fixture_alpha",
+              "node_type": "candidate_generator",
+              "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ]
+        },
+        "problem_space_version_id": "v0",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "no_op_control_failure",
+        "residue_ids": [
+          "residue:noop_control_seed42_g0:validation:0",
+          "residue:noop_control_seed42_g0:hidden_validation:1"
+        ]
+      },
+      {
+        "accepted": false,
+        "artifact_id": "random_control_seed42_g0",
+        "artifact_type": "primitive_candidate",
+        "decision_id": "decision:random_control_seed42_g0",
+        "lineage": {
+          "artifact_id": "random_control_seed42_g0",
+          "artifact_node": {
+            "capabilities": [
+              "primitive_candidate",
+              "deterministic_fixture"
+            ],
+            "metadata": {
+              "artifact_id": "random_control_seed42_g0",
+              "artifact_type": "primitive_candidate",
+              "created_generation": 0,
+              "declared_capabilities": [
+                "primitive_candidate",
+                "deterministic_fixture"
+              ],
+              "payload": {
+                "control_kind": "random",
+                "hidden_validation_score": 0.47050021510445333,
+                "program_family": "primitive_candidate",
+                "role": "random",
+                "validation_score": 0.49278853596915767
+              },
+              "producer": "hps_fixture_alpha",
+              "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+              "uses_test_signal": false
+            },
+            "module_name": "orchestrator_core.schemas.CandidateArtifact",
+            "node_id": "artifact:random_control_seed42_g0",
+            "node_type": "artifact",
+            "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+          },
+          "downstream_nodes": [
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "validation_gate",
+                "failure_residue_routing"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+              "node_id": "eie_evaluator",
+              "node_type": "evaluator",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            },
+            {
+              "capabilities": [
+                "failure_residue"
+              ],
+              "metadata": {
+                "evidence": {
+                  "artifact_id": "random_control_seed42_g0",
+                  "artifact_type": "primitive_candidate",
+                  "blind_spot": "artifact_failure_pattern",
+                  "control": "random_control",
+                  "control_kind": "random",
+                  "min_diversity": 3,
+                  "missing_signal": "artifact_failure_probe",
+                  "penalty": "validation_to_hidden_gap",
+                  "primitive": "unstable_primitive",
+                  "producer": "hps_fixture_alpha",
+                  "rejection_reason": "random_control_failure",
+                  "role": "random",
+                  "score": 0.47050021510445333,
+                  "threshold": 0.66
+                },
+                "failure_type": "random_control_failure",
+                "generation": 0,
+                "residue_id": "residue:random_control_seed42_g0:hidden_validation:1",
+                "severity": 0.4394997848955467,
+                "source": "orchestrator:eie_evaluator",
+                "split": "hidden_validation",
+                "suspected_instrument": "operator_generator:orch_opgen0"
+              },
+              "module_name": "eie_core.FailureResidue",
+              "node_id": "failure_residue:residue:random_control_seed42_g0:hidden_validation:1",
+              "node_type": "failure_residue",
+              "repo_name": null
+            },
+            {
+              "capabilities": [
+                "failure_residue"
+              ],
+              "metadata": {
+                "evidence": {
+                  "artifact_id": "random_control_seed42_g0",
+                  "artifact_type": "primitive_candidate",
+                  "blind_spot": "artifact_failure_pattern",
+                  "control": "random_control",
+                  "control_kind": "random",
+                  "min_diversity": 3,
+                  "missing_signal": "artifact_failure_probe",
+                  "penalty": "validation_to_hidden_gap",
+                  "primitive": "unstable_primitive",
+                  "producer": "hps_fixture_alpha",
+                  "rejection_reason": "random_control_failure",
+                  "role": "random",
+                  "score": 0.49278853596915767,
+                  "threshold": 0.7
+                },
+                "failure_type": "random_control_failure",
+                "generation": 0,
+                "residue_id": "residue:random_control_seed42_g0:validation:0",
+                "severity": 0.4572114640308423,
+                "source": "orchestrator:eie_evaluator",
+                "split": "validation",
+                "suspected_instrument": "operator_generator:orch_opgen0"
+              },
+              "module_name": "eie_core.FailureResidue",
+              "node_id": "failure_residue:residue:random_control_seed42_g0:validation:0",
+              "node_type": "failure_residue",
+              "repo_name": null
+            }
+          ],
+          "incoming_edges": [
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "produces:hps_fixture_alpha:random_control_seed42_g0",
+              "edge_type": "produces",
+              "metadata": {
+                "generation": 0
+              },
+              "source_node_id": "hps_fixture_alpha",
+              "target_node_id": "artifact:random_control_seed42_g0"
+            },
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "stores:random_control_seed42_g0:decision:random_control_seed42_g0",
+              "edge_type": "stores",
+              "metadata": {
+                "accepted": false
+              },
+              "source_node_id": "structural_memory",
+              "target_node_id": "artifact:random_control_seed42_g0"
+            }
+          ],
+          "outgoing_edges": [
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "evaluates:random_control_seed42_g0:hidden_validation:1",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": false,
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:random_control_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "evaluates:random_control_seed42_g0:validation:0",
+              "edge_type": "routes_to",
+              "metadata": {
+                "acceptance_driving": true,
+                "passed": false,
+                "split": "validation"
+              },
+              "source_node_id": "artifact:random_control_seed42_g0",
+              "target_node_id": "eie_evaluator"
+            },
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "rejects:random_control_seed42_g0:decision:random_control_seed42_g0",
+              "edge_type": "rejects",
+              "metadata": {
+                "rejection_reason": "random_control_failure"
+              },
+              "source_node_id": "artifact:random_control_seed42_g0",
+              "target_node_id": "structural_memory"
+            },
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "residue:random_control_seed42_g0:residue:random_control_seed42_g0:hidden_validation:1",
+              "edge_type": "produces",
+              "metadata": {
+                "failure_type": "random_control_failure",
+                "split": "hidden_validation"
+              },
+              "source_node_id": "artifact:random_control_seed42_g0",
+              "target_node_id": "failure_residue:residue:random_control_seed42_g0:hidden_validation:1"
+            },
+            {
+              "artifact_type": "primitive_candidate",
+              "edge_id": "residue:random_control_seed42_g0:residue:random_control_seed42_g0:validation:0",
+              "edge_type": "produces",
+              "metadata": {
+                "failure_type": "random_control_failure",
+                "split": "validation"
+              },
+              "source_node_id": "artifact:random_control_seed42_g0",
+              "target_node_id": "failure_residue:residue:random_control_seed42_g0:validation:0"
+            }
+          ],
+          "upstream_nodes": [
+            {
+              "capabilities": [
+                "operator_program",
+                "deterministic_fixture"
+              ],
+              "metadata": {
+                "seed": 42
+              },
+              "module_name": "orchestrator_core.adapters.HybridProgramSynthesisAdapter",
+              "node_id": "hps_fixture_alpha",
+              "node_type": "candidate_generator",
+              "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+            },
+            {
+              "capabilities": [
+                "decision_lineage",
+                "json_safe_records"
+              ],
+              "metadata": {},
+              "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+              "node_id": "structural_memory",
+              "node_type": "memory_store",
+              "repo_name": "DeepNeural-AutoExploration"
+            }
+          ]
+        },
+        "problem_space_version_id": "v0",
+        "producer": "hps_fixture_alpha",
+        "rejection_reason": "random_control_failure",
+        "residue_ids": [
+          "residue:random_control_seed42_g0:validation:0",
+          "residue:random_control_seed42_g0:hidden_validation:1"
+        ]
+      }
+    ]
+  },
+  "system_graph": {
+    "edge_count": 42,
+    "edges": [
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "accepts:op_valid_seed42_g0:v0",
+        "edge_type": "accepts",
+        "metadata": {
+          "decision_id": "decision:op_valid_seed42_g0"
+        },
+        "source_node_id": "artifact:op_valid_seed42_g0",
+        "target_node_id": "problem_space_version:v0"
+      },
+      {
+        "artifact_type": "primitive_candidate",
+        "edge_id": "accepts:primitive_valid_seed42_g0:v0",
+        "edge_type": "accepts",
+        "metadata": {
+          "decision_id": "decision:primitive_valid_seed42_g0"
+        },
+        "source_node_id": "artifact:primitive_valid_seed42_g0",
+        "target_node_id": "problem_space_version:v0"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "evaluates:noop_control_seed42_g0:hidden_validation:1",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": true,
+          "passed": false,
+          "split": "hidden_validation"
+        },
+        "source_node_id": "artifact:noop_control_seed42_g0",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "evaluates:noop_control_seed42_g0:validation:0",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": true,
+          "passed": false,
+          "split": "validation"
+        },
+        "source_node_id": "artifact:noop_control_seed42_g0",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "evaluates:op_invalid_seed42_g0:hidden_validation:1",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": true,
+          "passed": false,
+          "split": "hidden_validation"
+        },
+        "source_node_id": "artifact:op_invalid_seed42_g0",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "evaluates:op_invalid_seed42_g0:validation:0",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": true,
+          "passed": false,
+          "split": "validation"
+        },
+        "source_node_id": "artifact:op_invalid_seed42_g0",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "evaluates:op_test_signal_seed42_g0:hidden_validation:1",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": false,
+          "passed": true,
+          "split": "hidden_validation"
+        },
+        "source_node_id": "artifact:op_test_signal_seed42_g0",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "evaluates:op_test_signal_seed42_g0:validation:0",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": false,
+          "passed": true,
+          "split": "validation"
+        },
+        "source_node_id": "artifact:op_test_signal_seed42_g0",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "evaluates:op_valid_seed42_g0:hidden_validation:1",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": true,
+          "passed": true,
+          "split": "hidden_validation"
+        },
+        "source_node_id": "artifact:op_valid_seed42_g0",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "evaluates:op_valid_seed42_g0:validation:0",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": true,
+          "passed": true,
+          "split": "validation"
+        },
+        "source_node_id": "artifact:op_valid_seed42_g0",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "primitive_candidate",
+        "edge_id": "evaluates:primitive_valid_seed42_g0:hidden_validation:1",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": true,
+          "passed": true,
+          "split": "hidden_validation"
+        },
+        "source_node_id": "artifact:primitive_valid_seed42_g0",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "primitive_candidate",
+        "edge_id": "evaluates:primitive_valid_seed42_g0:validation:0",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": true,
+          "passed": true,
+          "split": "validation"
+        },
+        "source_node_id": "artifact:primitive_valid_seed42_g0",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "primitive_candidate",
+        "edge_id": "evaluates:random_control_seed42_g0:hidden_validation:1",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": true,
+          "passed": false,
+          "split": "hidden_validation"
+        },
+        "source_node_id": "artifact:random_control_seed42_g0",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "primitive_candidate",
+        "edge_id": "evaluates:random_control_seed42_g0:validation:0",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": true,
+          "passed": false,
+          "split": "validation"
+        },
+        "source_node_id": "artifact:random_control_seed42_g0",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "produces:hps_fixture_alpha:noop_control_seed42_g0",
+        "edge_type": "produces",
+        "metadata": {
+          "generation": 0
+        },
+        "source_node_id": "hps_fixture_alpha",
+        "target_node_id": "artifact:noop_control_seed42_g0"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "produces:hps_fixture_alpha:op_invalid_seed42_g0",
+        "edge_type": "produces",
+        "metadata": {
+          "generation": 0
+        },
+        "source_node_id": "hps_fixture_alpha",
+        "target_node_id": "artifact:op_invalid_seed42_g0"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "produces:hps_fixture_alpha:op_test_signal_seed42_g0",
+        "edge_type": "produces",
+        "metadata": {
+          "generation": 0
+        },
+        "source_node_id": "hps_fixture_alpha",
+        "target_node_id": "artifact:op_test_signal_seed42_g0"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "produces:hps_fixture_alpha:op_valid_seed42_g0",
+        "edge_type": "produces",
+        "metadata": {
+          "generation": 0
+        },
+        "source_node_id": "hps_fixture_alpha",
+        "target_node_id": "artifact:op_valid_seed42_g0"
+      },
+      {
+        "artifact_type": "primitive_candidate",
+        "edge_id": "produces:hps_fixture_alpha:primitive_valid_seed42_g0",
+        "edge_type": "produces",
+        "metadata": {
+          "generation": 0
+        },
+        "source_node_id": "hps_fixture_alpha",
+        "target_node_id": "artifact:primitive_valid_seed42_g0"
+      },
+      {
+        "artifact_type": "primitive_candidate",
+        "edge_id": "produces:hps_fixture_alpha:random_control_seed42_g0",
+        "edge_type": "produces",
+        "metadata": {
+          "generation": 0
+        },
+        "source_node_id": "hps_fixture_alpha",
+        "target_node_id": "artifact:random_control_seed42_g0"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "rejects:noop_control_seed42_g0:decision:noop_control_seed42_g0",
+        "edge_type": "rejects",
+        "metadata": {
+          "rejection_reason": "no_op_control_failure"
+        },
+        "source_node_id": "artifact:noop_control_seed42_g0",
+        "target_node_id": "structural_memory"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "rejects:op_invalid_seed42_g0:decision:op_invalid_seed42_g0",
+        "edge_type": "rejects",
+        "metadata": {
+          "rejection_reason": "invalid_operator_validation_failure"
+        },
+        "source_node_id": "artifact:op_invalid_seed42_g0",
+        "target_node_id": "structural_memory"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "rejects:op_test_signal_seed42_g0:decision:op_test_signal_seed42_g0",
+        "edge_type": "rejects",
+        "metadata": {
+          "rejection_reason": "artifact_uses_test_signal"
+        },
+        "source_node_id": "artifact:op_test_signal_seed42_g0",
+        "target_node_id": "structural_memory"
+      },
+      {
+        "artifact_type": "primitive_candidate",
+        "edge_id": "rejects:random_control_seed42_g0:decision:random_control_seed42_g0",
+        "edge_type": "rejects",
+        "metadata": {
+          "rejection_reason": "random_control_failure"
+        },
+        "source_node_id": "artifact:random_control_seed42_g0",
+        "target_node_id": "structural_memory"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "residue:noop_control_seed42_g0:residue:noop_control_seed42_g0:hidden_validation:1",
+        "edge_type": "produces",
+        "metadata": {
+          "failure_type": "no_op_control_failure",
+          "split": "hidden_validation"
+        },
+        "source_node_id": "artifact:noop_control_seed42_g0",
+        "target_node_id": "failure_residue:residue:noop_control_seed42_g0:hidden_validation:1"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "residue:noop_control_seed42_g0:residue:noop_control_seed42_g0:validation:0",
+        "edge_type": "produces",
+        "metadata": {
+          "failure_type": "no_op_control_failure",
+          "split": "validation"
+        },
+        "source_node_id": "artifact:noop_control_seed42_g0",
+        "target_node_id": "failure_residue:residue:noop_control_seed42_g0:validation:0"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "residue:op_invalid_seed42_g0:residue:op_invalid_seed42_g0:hidden_validation:1",
+        "edge_type": "produces",
+        "metadata": {
+          "failure_type": "invalid_operator_hidden_validation_failure",
+          "split": "hidden_validation"
+        },
+        "source_node_id": "artifact:op_invalid_seed42_g0",
+        "target_node_id": "failure_residue:residue:op_invalid_seed42_g0:hidden_validation:1"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "residue:op_invalid_seed42_g0:residue:op_invalid_seed42_g0:validation:0",
+        "edge_type": "produces",
+        "metadata": {
+          "failure_type": "invalid_operator_validation_failure",
+          "split": "validation"
+        },
+        "source_node_id": "artifact:op_invalid_seed42_g0",
+        "target_node_id": "failure_residue:residue:op_invalid_seed42_g0:validation:0"
+      },
+      {
+        "artifact_type": "primitive_candidate",
+        "edge_id": "residue:random_control_seed42_g0:residue:random_control_seed42_g0:hidden_validation:1",
+        "edge_type": "produces",
+        "metadata": {
+          "failure_type": "random_control_failure",
+          "split": "hidden_validation"
+        },
+        "source_node_id": "artifact:random_control_seed42_g0",
+        "target_node_id": "failure_residue:residue:random_control_seed42_g0:hidden_validation:1"
+      },
+      {
+        "artifact_type": "primitive_candidate",
+        "edge_id": "residue:random_control_seed42_g0:residue:random_control_seed42_g0:validation:0",
+        "edge_type": "produces",
+        "metadata": {
+          "failure_type": "random_control_failure",
+          "split": "validation"
+        },
+        "source_node_id": "artifact:random_control_seed42_g0",
+        "target_node_id": "failure_residue:residue:random_control_seed42_g0:validation:0"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "routes_to_eie:residue:noop_control_seed42_g0:hidden_validation:1",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": true
+        },
+        "source_node_id": "failure_residue:residue:noop_control_seed42_g0:hidden_validation:1",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "routes_to_eie:residue:noop_control_seed42_g0:validation:0",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": true
+        },
+        "source_node_id": "failure_residue:residue:noop_control_seed42_g0:validation:0",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "routes_to_eie:residue:op_invalid_seed42_g0:hidden_validation:1",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": true
+        },
+        "source_node_id": "failure_residue:residue:op_invalid_seed42_g0:hidden_validation:1",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "routes_to_eie:residue:op_invalid_seed42_g0:validation:0",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": true
+        },
+        "source_node_id": "failure_residue:residue:op_invalid_seed42_g0:validation:0",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "primitive_candidate",
+        "edge_id": "routes_to_eie:residue:random_control_seed42_g0:hidden_validation:1",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": true
+        },
+        "source_node_id": "failure_residue:residue:random_control_seed42_g0:hidden_validation:1",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "primitive_candidate",
+        "edge_id": "routes_to_eie:residue:random_control_seed42_g0:validation:0",
+        "edge_type": "routes_to",
+        "metadata": {
+          "acceptance_driving": true
+        },
+        "source_node_id": "failure_residue:residue:random_control_seed42_g0:validation:0",
+        "target_node_id": "eie_evaluator"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "stores:noop_control_seed42_g0:decision:noop_control_seed42_g0",
+        "edge_type": "stores",
+        "metadata": {
+          "accepted": false
+        },
+        "source_node_id": "structural_memory",
+        "target_node_id": "artifact:noop_control_seed42_g0"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "stores:op_invalid_seed42_g0:decision:op_invalid_seed42_g0",
+        "edge_type": "stores",
+        "metadata": {
+          "accepted": false
+        },
+        "source_node_id": "structural_memory",
+        "target_node_id": "artifact:op_invalid_seed42_g0"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "stores:op_test_signal_seed42_g0:decision:op_test_signal_seed42_g0",
+        "edge_type": "stores",
+        "metadata": {
+          "accepted": false
+        },
+        "source_node_id": "structural_memory",
+        "target_node_id": "artifact:op_test_signal_seed42_g0"
+      },
+      {
+        "artifact_type": "operator_program",
+        "edge_id": "stores:op_valid_seed42_g0:decision:op_valid_seed42_g0",
+        "edge_type": "stores",
+        "metadata": {
+          "accepted": true
+        },
+        "source_node_id": "structural_memory",
+        "target_node_id": "artifact:op_valid_seed42_g0"
+      },
+      {
+        "artifact_type": "primitive_candidate",
+        "edge_id": "stores:primitive_valid_seed42_g0:decision:primitive_valid_seed42_g0",
+        "edge_type": "stores",
+        "metadata": {
+          "accepted": true
+        },
+        "source_node_id": "structural_memory",
+        "target_node_id": "artifact:primitive_valid_seed42_g0"
+      },
+      {
+        "artifact_type": "primitive_candidate",
+        "edge_id": "stores:random_control_seed42_g0:decision:random_control_seed42_g0",
+        "edge_type": "stores",
+        "metadata": {
+          "accepted": false
+        },
+        "source_node_id": "structural_memory",
+        "target_node_id": "artifact:random_control_seed42_g0"
+      }
+    ],
+    "node_count": 17,
+    "nodes": [
+      {
+        "capabilities": [
+          "operator_program",
+          "deterministic_fixture"
+        ],
+        "metadata": {
+          "artifact_id": "noop_control_seed42_g0",
+          "artifact_type": "operator_program",
+          "created_generation": 0,
+          "declared_capabilities": [
+            "operator_program",
+            "deterministic_fixture"
+          ],
+          "payload": {
+            "control_kind": "no_op",
+            "hidden_validation_score": 0.5,
+            "program_family": "operator_program",
+            "role": "no_op",
+            "validation_score": 0.5
+          },
+          "producer": "hps_fixture_alpha",
+          "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+          "uses_test_signal": false
+        },
+        "module_name": "orchestrator_core.schemas.CandidateArtifact",
+        "node_id": "artifact:noop_control_seed42_g0",
+        "node_type": "artifact",
+        "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+      },
+      {
+        "capabilities": [
+          "operator_program",
+          "deterministic_fixture"
+        ],
+        "metadata": {
+          "artifact_id": "op_invalid_seed42_g0",
+          "artifact_type": "operator_program",
+          "created_generation": 0,
+          "declared_capabilities": [
+            "operator_program",
+            "deterministic_fixture"
+          ],
+          "payload": {
+            "control_kind": "candidate",
+            "hidden_validation_score": 0.36,
+            "program_family": "operator_program",
+            "role": "invalid_operator",
+            "validation_score": 0.42
+          },
+          "producer": "hps_fixture_alpha",
+          "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+          "uses_test_signal": false
+        },
+        "module_name": "orchestrator_core.schemas.CandidateArtifact",
+        "node_id": "artifact:op_invalid_seed42_g0",
+        "node_type": "artifact",
+        "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+      },
+      {
+        "capabilities": [
+          "operator_program",
+          "deterministic_fixture"
+        ],
+        "metadata": {
+          "artifact_id": "op_test_signal_seed42_g0",
+          "artifact_type": "operator_program",
+          "created_generation": 0,
+          "declared_capabilities": [
+            "operator_program",
+            "deterministic_fixture"
+          ],
+          "payload": {
+            "control_kind": "candidate",
+            "hidden_validation_score": 0.89,
+            "program_family": "operator_program",
+            "role": "test_signal_trap",
+            "validation_score": 0.91
+          },
+          "producer": "hps_fixture_alpha",
+          "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+          "uses_test_signal": true
+        },
+        "module_name": "orchestrator_core.schemas.CandidateArtifact",
+        "node_id": "artifact:op_test_signal_seed42_g0",
+        "node_type": "artifact",
+        "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+      },
+      {
+        "capabilities": [
+          "operator_program",
+          "deterministic_fixture"
+        ],
+        "metadata": {
+          "artifact_id": "op_valid_seed42_g0",
+          "artifact_type": "operator_program",
+          "created_generation": 0,
+          "declared_capabilities": [
+            "operator_program",
+            "deterministic_fixture"
+          ],
+          "payload": {
+            "control_kind": "candidate",
+            "hidden_validation_score": 0.8,
+            "program_family": "operator_program",
+            "role": "valid_operator",
+            "validation_score": 0.86
+          },
+          "producer": "hps_fixture_alpha",
+          "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+          "uses_test_signal": false
+        },
+        "module_name": "orchestrator_core.schemas.CandidateArtifact",
+        "node_id": "artifact:op_valid_seed42_g0",
+        "node_type": "artifact",
+        "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+      },
+      {
+        "capabilities": [
+          "primitive_candidate",
+          "deterministic_fixture"
+        ],
+        "metadata": {
+          "artifact_id": "primitive_valid_seed42_g0",
+          "artifact_type": "primitive_candidate",
+          "created_generation": 0,
+          "declared_capabilities": [
+            "primitive_candidate",
+            "deterministic_fixture"
+          ],
+          "payload": {
+            "control_kind": "candidate",
+            "hidden_validation_score": 0.73,
+            "program_family": "primitive_candidate",
+            "role": "valid_primitive",
+            "validation_score": 0.78
+          },
+          "producer": "hps_fixture_alpha",
+          "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+          "uses_test_signal": false
+        },
+        "module_name": "orchestrator_core.schemas.CandidateArtifact",
+        "node_id": "artifact:primitive_valid_seed42_g0",
+        "node_type": "artifact",
+        "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+      },
+      {
+        "capabilities": [
+          "primitive_candidate",
+          "deterministic_fixture"
+        ],
+        "metadata": {
+          "artifact_id": "random_control_seed42_g0",
+          "artifact_type": "primitive_candidate",
+          "created_generation": 0,
+          "declared_capabilities": [
+            "primitive_candidate",
+            "deterministic_fixture"
+          ],
+          "payload": {
+            "control_kind": "random",
+            "hidden_validation_score": 0.47050021510445333,
+            "program_family": "primitive_candidate",
+            "role": "random",
+            "validation_score": 0.49278853596915767
+          },
+          "producer": "hps_fixture_alpha",
+          "source_repo": "Hybrid-Program-Synthesis-with-RSI",
+          "uses_test_signal": false
+        },
+        "module_name": "orchestrator_core.schemas.CandidateArtifact",
+        "node_id": "artifact:random_control_seed42_g0",
+        "node_type": "artifact",
+        "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+      },
+      {
+        "capabilities": [
+          "validation_gate",
+          "failure_residue_routing"
+        ],
+        "metadata": {},
+        "module_name": "orchestrator_core.adapters.DeepNeuralEIEAdapter",
+        "node_id": "eie_evaluator",
+        "node_type": "evaluator",
+        "repo_name": "DeepNeural-AutoExploration"
+      },
+      {
+        "capabilities": [
+          "failure_residue"
+        ],
+        "metadata": {
+          "evidence": {
+            "artifact_id": "noop_control_seed42_g0",
+            "artifact_type": "operator_program",
+            "blind_spot": "artifact_failure_pattern",
+            "control": "no_op_control",
+            "control_kind": "no_op",
+            "min_diversity": 3,
+            "missing_signal": "artifact_failure_probe",
+            "penalty": "validation_to_hidden_gap",
+            "primitive": "candidate_operator",
+            "producer": "hps_fixture_alpha",
+            "rejection_reason": "no_op_control_failure",
+            "role": "no_op",
+            "score": 0.5,
+            "threshold": 0.66
+          },
+          "failure_type": "no_op_control_failure",
+          "generation": 0,
+          "residue_id": "residue:noop_control_seed42_g0:hidden_validation:1",
+          "severity": 0.41000000000000003,
+          "source": "orchestrator:eie_evaluator",
+          "split": "hidden_validation",
+          "suspected_instrument": "experiment_unit:orch_exp0"
+        },
+        "module_name": "eie_core.FailureResidue",
+        "node_id": "failure_residue:residue:noop_control_seed42_g0:hidden_validation:1",
+        "node_type": "failure_residue",
+        "repo_name": null
+      },
+      {
+        "capabilities": [
+          "failure_residue"
+        ],
+        "metadata": {
+          "evidence": {
+            "artifact_id": "noop_control_seed42_g0",
+            "artifact_type": "operator_program",
+            "blind_spot": "artifact_failure_pattern",
+            "control": "no_op_control",
+            "control_kind": "no_op",
+            "min_diversity": 3,
+            "missing_signal": "artifact_failure_probe",
+            "penalty": "validation_to_hidden_gap",
+            "primitive": "candidate_operator",
+            "producer": "hps_fixture_alpha",
+            "rejection_reason": "no_op_control_failure",
+            "role": "no_op",
+            "score": 0.5,
+            "threshold": 0.7
+          },
+          "failure_type": "no_op_control_failure",
+          "generation": 0,
+          "residue_id": "residue:noop_control_seed42_g0:validation:0",
+          "severity": 0.44999999999999996,
+          "source": "orchestrator:eie_evaluator",
+          "split": "validation",
+          "suspected_instrument": "experiment_unit:orch_exp0"
+        },
+        "module_name": "eie_core.FailureResidue",
+        "node_id": "failure_residue:residue:noop_control_seed42_g0:validation:0",
+        "node_type": "failure_residue",
+        "repo_name": null
+      },
+      {
+        "capabilities": [
+          "failure_residue"
+        ],
+        "metadata": {
+          "evidence": {
+            "artifact_id": "op_invalid_seed42_g0",
+            "artifact_type": "operator_program",
+            "blind_spot": "artifact_failure_pattern",
+            "control": "",
+            "control_kind": "candidate",
+            "min_diversity": 3,
+            "missing_signal": "artifact_failure_probe",
+            "penalty": "validation_to_hidden_gap",
+            "primitive": "candidate_operator",
+            "producer": "hps_fixture_alpha",
+            "rejection_reason": "invalid_operator_hidden_validation_failure",
+            "role": "invalid_operator",
+            "score": 0.36,
+            "threshold": 0.66
+          },
+          "failure_type": "invalid_operator_hidden_validation_failure",
+          "generation": 0,
+          "residue_id": "residue:op_invalid_seed42_g0:hidden_validation:1",
+          "severity": 0.55,
+          "source": "orchestrator:eie_evaluator",
+          "split": "hidden_validation",
+          "suspected_instrument": "operator_generator:orch_opgen0"
+        },
+        "module_name": "eie_core.FailureResidue",
+        "node_id": "failure_residue:residue:op_invalid_seed42_g0:hidden_validation:1",
+        "node_type": "failure_residue",
+        "repo_name": null
+      },
+      {
+        "capabilities": [
+          "failure_residue"
+        ],
+        "metadata": {
+          "evidence": {
+            "artifact_id": "op_invalid_seed42_g0",
+            "artifact_type": "operator_program",
+            "blind_spot": "artifact_failure_pattern",
+            "control": "",
+            "control_kind": "candidate",
+            "min_diversity": 3,
+            "missing_signal": "artifact_failure_probe",
+            "penalty": "validation_to_hidden_gap",
+            "primitive": "candidate_operator",
+            "producer": "hps_fixture_alpha",
+            "rejection_reason": "invalid_operator_validation_failure",
+            "role": "invalid_operator",
+            "score": 0.42,
+            "threshold": 0.7
+          },
+          "failure_type": "invalid_operator_validation_failure",
+          "generation": 0,
+          "residue_id": "residue:op_invalid_seed42_g0:validation:0",
+          "severity": 0.53,
+          "source": "orchestrator:eie_evaluator",
+          "split": "validation",
+          "suspected_instrument": "operator_generator:orch_opgen0"
+        },
+        "module_name": "eie_core.FailureResidue",
+        "node_id": "failure_residue:residue:op_invalid_seed42_g0:validation:0",
+        "node_type": "failure_residue",
+        "repo_name": null
+      },
+      {
+        "capabilities": [
+          "failure_residue"
+        ],
+        "metadata": {
+          "evidence": {
+            "artifact_id": "random_control_seed42_g0",
+            "artifact_type": "primitive_candidate",
+            "blind_spot": "artifact_failure_pattern",
+            "control": "random_control",
+            "control_kind": "random",
+            "min_diversity": 3,
+            "missing_signal": "artifact_failure_probe",
+            "penalty": "validation_to_hidden_gap",
+            "primitive": "unstable_primitive",
+            "producer": "hps_fixture_alpha",
+            "rejection_reason": "random_control_failure",
+            "role": "random",
+            "score": 0.47050021510445333,
+            "threshold": 0.66
+          },
+          "failure_type": "random_control_failure",
+          "generation": 0,
+          "residue_id": "residue:random_control_seed42_g0:hidden_validation:1",
+          "severity": 0.4394997848955467,
+          "source": "orchestrator:eie_evaluator",
+          "split": "hidden_validation",
+          "suspected_instrument": "operator_generator:orch_opgen0"
+        },
+        "module_name": "eie_core.FailureResidue",
+        "node_id": "failure_residue:residue:random_control_seed42_g0:hidden_validation:1",
+        "node_type": "failure_residue",
+        "repo_name": null
+      },
+      {
+        "capabilities": [
+          "failure_residue"
+        ],
+        "metadata": {
+          "evidence": {
+            "artifact_id": "random_control_seed42_g0",
+            "artifact_type": "primitive_candidate",
+            "blind_spot": "artifact_failure_pattern",
+            "control": "random_control",
+            "control_kind": "random",
+            "min_diversity": 3,
+            "missing_signal": "artifact_failure_probe",
+            "penalty": "validation_to_hidden_gap",
+            "primitive": "unstable_primitive",
+            "producer": "hps_fixture_alpha",
+            "rejection_reason": "random_control_failure",
+            "role": "random",
+            "score": 0.49278853596915767,
+            "threshold": 0.7
+          },
+          "failure_type": "random_control_failure",
+          "generation": 0,
+          "residue_id": "residue:random_control_seed42_g0:validation:0",
+          "severity": 0.4572114640308423,
+          "source": "orchestrator:eie_evaluator",
+          "split": "validation",
+          "suspected_instrument": "operator_generator:orch_opgen0"
+        },
+        "module_name": "eie_core.FailureResidue",
+        "node_id": "failure_residue:residue:random_control_seed42_g0:validation:0",
+        "node_type": "failure_residue",
+        "repo_name": null
+      },
+      {
+        "capabilities": [
+          "operator_program",
+          "deterministic_fixture"
+        ],
+        "metadata": {
+          "seed": 42
+        },
+        "module_name": "orchestrator_core.adapters.HybridProgramSynthesisAdapter",
+        "node_id": "hps_fixture_alpha",
+        "node_type": "candidate_generator",
+        "repo_name": "Hybrid-Program-Synthesis-with-RSI"
+      },
+      {
+        "capabilities": [
+          "artifact_coordination",
+          "control_routing"
+        ],
+        "metadata": {},
+        "module_name": "orchestrator_core.router.DeterministicRouter",
+        "node_id": "orchestrator",
+        "node_type": "orchestrator",
+        "repo_name": "DeepNeural-AutoExploration"
+      },
+      {
+        "capabilities": [
+          "problem_space_lineage"
+        ],
+        "metadata": {
+          "version_id": "v0"
+        },
+        "module_name": "eie_core.ProblemSpaceVersion",
+        "node_id": "problem_space_version:v0",
+        "node_type": "problem_space_version",
+        "repo_name": "DeepNeural-AutoExploration"
+      },
+      {
+        "capabilities": [
+          "decision_lineage",
+          "json_safe_records"
+        ],
+        "metadata": {},
+        "module_name": "orchestrator_core.memory_store.StructuralMemoryStore",
+        "node_id": "structural_memory",
+        "node_type": "memory_store",
+        "repo_name": "DeepNeural-AutoExploration"
+      }
+    ]
+  },
+  "timestamp": "2026-05-13T11:23:50.053675+00:00",
+  "used_test_signal_for_acceptance": false,
+  "validation_only_acceptance_enforced": true
+}

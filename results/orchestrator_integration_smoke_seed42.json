@@ -1,0 +1,156 @@
+{
+  "accepted_artifact_count": 2,
+  "anti_cheat_checks_passed": [
+    "random seed recorded",
+    "validation and hidden-validation are the only acceptance splits",
+    "held-out test records are stored only after decisions are frozen",
+    "artifacts marked uses_test_signal are rejected",
+    "test split evaluations do not drive acceptance",
+    "rejected artifacts include rejection reasons",
+    "failed acceptance evaluations produce failure residues",
+    "accepted artifacts have system graph lineage",
+    "accepted and rejected artifacts are stored in structural memory",
+    "no-op control artifact is rejected",
+    "random control artifact is recorded",
+    "no external APIs are used",
+    "no network calls are used",
+    "no LLM calls are used",
+    "no generated source is executed",
+    "outputs are JSON serializable"
+  ],
+  "artifact_count": 6,
+  "config": {
+    "artifact_ids": [
+      "op_valid_seed42_g0",
+      "op_invalid_seed42_g0",
+      "primitive_valid_seed42_g0",
+      "op_test_signal_seed42_g0",
+      "noop_control_seed42_g0",
+      "random_control_seed42_g0"
+    ],
+    "benchmark": "orchestrator_integration",
+    "generations": [
+      0
+    ],
+    "mode": "smoke",
+    "seed": 42
+  },
+  "deterministic_replay_passed": true,
+  "eie_routed_residue_count": 6,
+  "failure_residue_count": 6,
+  "full_validation_passed": false,
+  "graph_edge_count": 42,
+  "graph_node_count": 17,
+  "held_out_test_record_count": 2,
+  "hidden_validation_evaluation_count": 6,
+  "lineage_record_count": 2,
+  "manifest_path": "results\\orchestrator_integration_smoke_seed42.manifest.json",
+  "memory_record_count": 15,
+  "metrics": {
+    "accepted_artifact_count": 2,
+    "artifact_count": 6,
+    "deterministic_replay_passed": true,
+    "eie_routed_residue_count": 6,
+    "failure_residue_count": 6,
+    "full_validation_passed": false,
+    "graph_edge_count": 42,
+    "graph_node_count": 17,
+    "held_out_test_record_count": 2,
+    "hidden_validation_evaluation_count": 6,
+    "lineage_record_count": 2,
+    "manifest_path": "results\\orchestrator_integration_smoke_seed42.manifest.json",
+    "memory_record_count": 15,
+    "mode": "smoke",
+    "no_op_control_rejected": true,
+    "random_control_recorded": true,
+    "rejected_artifact_count": 4,
+    "test_signal_artifact_rejected": true,
+    "used_test_signal_for_acceptance": false,
+    "validation_evaluation_count": 6
+  },
+  "mode": "smoke",
+  "no_op_control_rejected": true,
+  "orchestrator_decisions": [
+    {
+      "accepted": true,
+      "artifact_id": "op_valid_seed42_g0",
+      "decision_id": "decision:op_valid_seed42_g0",
+      "problem_space_version_id": "v0",
+      "rejection_reason": "accepted",
+      "residue_ids": [],
+      "routed_to_eie": false,
+      "stored_in_memory": true,
+      "uses_test_signal_for_acceptance": false
+    },
+    {
+      "accepted": false,
+      "artifact_id": "op_invalid_seed42_g0",
+      "decision_id": "decision:op_invalid_seed42_g0",
+      "problem_space_version_id": "v0",
+      "rejection_reason": "invalid_operator_validation_failure",
+      "residue_ids": [
+        "residue:op_invalid_seed42_g0:validation:0",
+        "residue:op_invalid_seed42_g0:hidden_validation:1"
+      ],
+      "routed_to_eie": true,
+      "stored_in_memory": true,
+      "uses_test_signal_for_acceptance": false
+    },
+    {
+      "accepted": true,
+      "artifact_id": "primitive_valid_seed42_g0",
+      "decision_id": "decision:primitive_valid_seed42_g0",
+      "problem_space_version_id": "v0",
+      "rejection_reason": "accepted",
+      "residue_ids": [],
+      "routed_to_eie": false,
+      "stored_in_memory": true,
+      "uses_test_signal_for_acceptance": false
+    },
+    {
+      "accepted": false,
+      "artifact_id": "op_test_signal_seed42_g0",
+      "decision_id": "decision:op_test_signal_seed42_g0",
+      "problem_space_version_id": "v0",
+      "rejection_reason": "artifact_uses_test_signal",
+      "residue_ids": [],
+      "routed_to_eie": false,
+      "stored_in_memory": true,
+      "uses_test_signal_for_acceptance": false
+    },
+    {
+      "accepted": false,
+      "artifact_id": "noop_control_seed42_g0",
+      "decision_id": "decision:noop_control_seed42_g0",
+      "problem_space_version_id": "v0",
+      "rejection_reason": "no_op_control_failure",
+      "residue_ids": [
+        "residue:noop_control_seed42_g0:validation:0",
+        "residue:noop_control_seed42_g0:hidden_validation:1"
+      ],
+      "routed_to_eie": true,
+      "stored_in_memory": true,
+      "uses_test_signal_for_acceptance": false
+    },
+    {
+      "accepted": false,
+      "artifact_id": "random_control_seed42_g0",
+      "decision_id": "decision:random_control_seed42_g0",
+      "problem_space_version_id": "v0",
+      "rejection_reason": "random_control_failure",
+      "residue_ids": [
+        "residue:random_control_seed42_g0:validation:0",
+        "residue:random_control_seed42_g0:hidden_validation:1"
+      ],
+      "routed_to_eie": true,
+      "stored_in_memory": true,
+      "uses_test_signal_for_acceptance": false
+    }
+  ],
+  "random_control_recorded": true,
+  "rejected_artifact_count": 4,
+  "seed": 42,
+  "test_signal_artifact_rejected": true,
+  "used_test_signal_for_acceptance": false,
+  "validation_evaluation_count": 6
+}

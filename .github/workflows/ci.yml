@@ -49,6 +49,13 @@ jobs:
           python benchmarks/code_level_rsi_benchmark.py --mode smoke --seed 42 --output "$CODE_RSI_JSON"
           python scripts/verify_code_level_rsi_smoke.py "$CODE_RSI_JSON"
 
+      - name: Run orchestrator smoke benchmark
+        env:
+          ORCH_JSON: ${{ runner.temp }}/orchestrator_integration_smoke_seed42.json
+        run: |
+          python benchmarks/orchestrator_integration_smoke.py --mode smoke --seed 42 --output "$ORCH_JSON"
+          python scripts/verify_orchestrator_smoke.py "$ORCH_JSON"
+
       - name: Upload recursive smoke outputs
         uses: actions/upload-artifact@v4
         with:
@@ -60,3 +67,5 @@ jobs:
             ${{ runner.temp }}/recursive_self_improvement_smoke_seed42.manifest.json
             ${{ runner.temp }}/code_level_rsi_smoke_seed42.json
             ${{ runner.temp }}/code_level_rsi_smoke_seed42.manifest.json
+            ${{ runner.temp }}/orchestrator_integration_smoke_seed42.json
+            ${{ runner.temp }}/orchestrator_integration_smoke_seed42.manifest.json
