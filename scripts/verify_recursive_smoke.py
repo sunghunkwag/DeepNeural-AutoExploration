@@ -54,7 +54,8 @@ def verify(result_path: Path) -> None:
     result = _load_json(result_path)
     manifest_path = Path(str(result.get("manifest_path", result_path.with_suffix(".manifest.json"))))
     if not manifest_path.is_absolute():
-        manifest_path = result_path.parent / manifest_path
+        direct = manifest_path
+        manifest_path = direct if direct.exists() else result_path.parent / direct.name
     manifest = _load_json(manifest_path)
 
     _assert_non_empty_split_ids(result, "result")
