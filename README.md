@@ -13,6 +13,7 @@ Supported claims:
 - It exposes AGI-relevant metrics such as adaptation improvement, OOD gap, world-model error, memory precision, planning success, rollback count, and validation-vs-test gap.
 - It can generate bounded operator programs, validate them, accept robust improvements, reject/roll back failures, reuse accepted candidates, and record manifests under validation-only and anti-cheat constraints.
 - It can learn a bounded self-model over validation-only candidate outcomes, compress failures into future-generation rewrite rules, and evolve acceptance evaluators only after adversarial checks.
+- It now uses hidden OOD validation gates, robust generalization scoring, and guarded learned-selector deployment so accepted RSI changes must survive transfer-oriented checks rather than only improving visible validation loss.
 - It includes a bounded interaction scaffold for micro-turn simulation, JSONL trace replay, interaction residue extraction, evaluator-evolution bridge records, CPU-runnable interaction benchmarks, and manifest-backed anti-cheat controls.
 
 Unsupported claims:
@@ -54,9 +55,9 @@ Unsupported claims:
 - `adaptation_operators.py`
   - `OperatorGenome` and executable `AdaptationOperator` rules: functional MAML, Reptile-style update, memory-gated gradient scaling, and world-model-predicted learning-rate schedule.
 - `operator_dsl.py`
-  - A bounded operator-program DSL with gradient, memory, world-model, objective, and schedule primitives that compile into executable adaptation operators.
+  - A bounded operator-program DSL with gradient, memory, world-model, objective, support-proxy, and schedule primitives that compile into executable adaptation operators.
 - `rsi_candidate_generator.py`
-  - Deterministic candidate generation through parent mutation, recombination, parameter perturbation, primitive insertion/deletion/replacement, schedule mutation, memory-gate mutation, and world-model-gate mutation.
+  - Deterministic candidate generation through parent mutation, recombination, parameter perturbation, primitive insertion/deletion/replacement, schedule mutation, memory-gate mutation, world-model-gate mutation, and support-proxy mutations.
 - `candidate_sandbox.py`
   - Isolated local candidate compilation/evaluation with timeout, exception capture, NaN/inf rejection, exploding-loss rejection, and serialized candidate evidence.
 - `self_model.py`
@@ -164,6 +165,7 @@ The repository includes tests and code paths intended to catch common benchmark 
 - Accepted operator mutations must alter runtime adaptation behavior, not only metadata.
 - Synthesized operator programs must compile into executable operators and change runtime behavior before they can be accepted.
 - Candidate programs are evaluated for acceptance only on validation and hidden-control validation pools, never on held-out test tasks.
+- Candidate acceptance now combines visible validation improvement, hidden OOD validation improvement, worst-hidden regression penalties, control margins, and selector guards before deployment.
 - Candidate failures, NaN/inf losses, exploding losses, deterministic replay failures, and missing runtime differences are rejected and logged.
 - Accepted operator programs must be reusable by later generations.
 - Self-model records marked as held-out test split are rejected.
@@ -295,13 +297,13 @@ By default, results are written to:
 The recursive benchmark loop is:
 
 ```text
-sample train/validation/test task families
+sample train/validation/hidden-validation/test task families
 -> infer support-only task context
 -> retrieve train-only non-leaking memory
 -> collect train traces from executable operator genes
 -> train learned meta-controller and world model on allowed operator traces
--> evaluate executable operator mutation candidates on validation tasks only
--> accept statistically consistent validation improvements
+-> evaluate executable operator mutation candidates on visible validation and hidden OOD validation tasks
+-> accept only statistically consistent robust improvements
 -> roll back rejected mutations
 -> reuse accepted operator genes in later generations
 -> freeze accepted state
@@ -309,7 +311,7 @@ sample train/validation/test task families
 -> write JSON result and anti-cheat manifest
 ```
 
-The benchmark reports ablations for no adaptation, functional MAML, learned task encoder only, memory-conditioned adaptation, world-model controller, learned meta-controller, random/fixed/wrong controllers, self-improvement with and without rollback, full recursive loop, wrong-world-model full loop, shuffled-memory full loop, and no-mutation full loop. Operator-level metrics include improvement velocity, operator reuse success, controller prediction error reduction across generations, OOD transfer after accepted mutations, accepted mutation quality, accepted operator count, and dead-code detection.
+The benchmark reports ablations for no adaptation, functional MAML, learned task encoder only, memory-conditioned adaptation, world-model controller, learned meta-controller, random/fixed/wrong controllers, self-improvement with and without rollback, full recursive loop, wrong-world-model full loop, shuffled-memory full loop, and no-mutation full loop. Operator-level metrics include improvement velocity, operator reuse success, controller prediction error reduction across generations, OOD transfer after accepted mutations, accepted mutation quality, accepted operator count, selector guard fallback count, and dead-code detection.
 
 ## Running the bounded code-level RSI benchmark
 
@@ -340,20 +342,46 @@ initialize accepted operator programs
 -> train learned meta-controller and world model on train traces
 -> generate bounded DSL candidate programs from accepted parents
 -> compile candidates into executable adaptation operators
--> evaluate candidates in an isolated local sandbox on validation tasks only
--> reject invalid, unstable, leaking, dead-code, or weak candidates
--> accept statistically stronger validation candidates and roll back failures
+-> evaluate candidates in an isolated local sandbox on visible validation and hidden OOD validation tasks
+-> reject invalid, unstable, leaking, dead-code, weak, or hidden-regressing candidates
+-> accept candidates only when robust generalization score and control gates pass
 -> reuse accepted candidate programs in later generations
 -> freeze accepted state
 -> evaluate held-out OOD test tasks
 -> write JSON result and anti-cheat manifest
 ```
 
-The code-level benchmark reports candidate count, compile count, failed compile count, validation rejected count, accepted program count, rollback count, accepted program reuse count, improvement velocity, improvement acceleration, mutation quality, candidate survival rate, validation-to-test gap, OOD transfer after accepted programs, controller prediction error, controller prediction error reduction across generations, world-model prediction error, world-model selection effect, memory-gate effect, wrong-world-model degradation, shuffled-memory degradation, full loop versus no synthesis, full loop versus fixed operators, full loop versus random candidate generator, full loop versus no rollback, test-leak trap status, and dead-code detector status.
+The code-level benchmark reports candidate count, compile count, failed compile count, validation rejected count, accepted program count, rollback count, accepted program reuse count, improvement velocity, improvement acceleration, robust mutation quality, candidate survival rate, validation-to-test gap, OOD transfer after accepted programs, controller prediction error, controller prediction error reduction across generations, world-model prediction error, world-model selection effect, memory-gate effect, selector guard fallback count, wrong-world-model degradation, shuffled-memory degradation, full loop versus no synthesis, full loop versus fixed operators, full loop versus random candidate generator, full loop versus no rollback, test-leak trap status, and dead-code detector status.
 
 The next-layer metrics include self-model prediction error, self-model error reduction, failure-rule count, failure-rule reuse count, candidate quality after failure rules, evaluator candidate count, accepted evaluator count, probation evaluator count, evaluator overfit detector, candidate quality per compute, future candidate quality prediction error, OOD transfer after evaluator evolution, full loop versus no self-model, full loop versus no failure grammar, and full loop versus no evaluator evolution.
 
-Supported claim for this benchmark: the system can generate bounded operator programs, compile and execute them, rank them with a train/validation-only self-model, rewrite them using compressed failure rules, validate them under sandboxed validation-only controls, evolve probationary evaluators under adversarial checks, reject/roll back failures, accept robust improvements, reuse accepted candidates, evaluate frozen accepted programs on held-out OOD tests, and write audit manifests. Unsupported claim: broad intelligence or autonomous open-ended recursive self-improvement.
+Supported claim for this benchmark: the system can generate bounded operator programs, compile and execute them, rank them with a train/validation-only self-model, rewrite them using compressed failure rules, validate them under sandboxed validation-only and hidden OOD controls, evolve probationary evaluators under adversarial checks, reject/roll back failures, accept robust improvements, reuse accepted candidates, evaluate frozen accepted programs on held-out OOD tests, and write audit manifests. Unsupported claim: broad intelligence or autonomous open-ended recursive self-improvement.
+
+## Guarded RSI generalization upgrade
+
+The current RSI upgrade adds real executable behavior and stricter acceptance rather than only wrapping the benchmark surface:
+
+- `operator_dsl.py` includes `support_proxy_step`, an executable support-proxy gradient primitive that can change runtime adaptation behavior.
+- `rsi_candidate_generator.py` can synthesize support-proxy mutation and recombination candidates from accepted parents.
+- `benchmarks/code_level_rsi_benchmark.py` scores candidates with `robust_generalization_score`, combining visible validation gain, hidden OOD validation gain, and worst-hidden regression penalties.
+- `benchmarks/recursive_self_improvement_benchmark.py` adds hidden OOD validation splits to recursive mutation acceptance and ablation evaluation.
+- Learned selector deployment is guarded by a required relative improvement over active/fixed selectors; otherwise the benchmark falls back instead of deploying a learned selector that only looks good in-sample.
+- `evaluator_evolution.py` can place evaluator candidates on probation when adversarial checks pass and total robust score improves, even if the ranking is unchanged.
+
+Local verification used for this upgrade:
+
+```bash
+python -m pytest -q
+# 159 passed
+
+python -m pytest tests/test_code_level_rsi.py tests/test_recursive_self_improvement.py tests/test_operator_genome.py -q
+# 31 passed
+
+python scripts/verify_code_level_rsi_smoke.py results/code_level_rsi_smoke_actual_upgrade_seed42.json
+python scripts/verify_recursive_smoke.py results/recursive_self_improvement_smoke_guarded_seed42.json
+```
+
+Observed quick-mode behavior is intentionally conservative: the recursive operator-level benchmark moved from negative to positive OOD transfer in the local comparison, while the code-level benchmark stopped accepting generated programs that failed the hidden OOD gate. That means the repository now favors rejecting weak self-improvement candidates over accepting visible-validation gains that do not generalize.
 
 ## Epistemic Instrument Evolution (EIE)
 
