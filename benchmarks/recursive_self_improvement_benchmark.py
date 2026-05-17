@@ -46,6 +46,7 @@ from model_based_controller import (
     memory_conditioned_inner_lr,
 )
 from operator_mutation import OperatorMutation, OperatorMutationController, allowed_operator_mutations
+from operator_dsl import supervised_task_loss
 from rsi_dnax_core import DNAXConfig, DeepNeuralAutoExplorer
 from task_suite import ProceduralTaskSuite, SyntheticTask, assert_disjoint_task_ids
 
@@ -91,9 +92,9 @@ def _make_config(state: Dict[str, object]) -> DNAXConfig:
     width = float(state.get("width_multiplier", 1.0))
     hidden = [max(8, int(round(16 * width))), max(8, int(round(16 * width)))]
     return DNAXConfig(
-        input_dim=1,
+        input_dim=int(state.get("input_dim", 1)),
         hidden_dims=hidden,
-        output_dim=1,
+        output_dim=int(state.get("output_dim", 1)),
         dropout_rate=0.0,
         spectral_norm=False,
         verbose=False,
@@ -114,14 +115,23 @@ def _make_model(state: Dict[str, object]) -> DeepNeuralAutoExplorer:
 
 def _loss_no_adapt(model: DeepNeuralAutoExplorer, task: SyntheticTask) -> float:
     with torch.no_grad():
-        return float(F.mse_loss(model(task.query_x), task.query_y))
+        return float(supervised_task_loss(model(task.query_x), task.query_y, task.metadata))
 
 
 def _loss_maml(model: DeepNeuralAutoExplorer, task: SyntheticTask, inner_lr: float, inner_steps: int) -> float:
     steps = max(1, min(4, int(inner_steps)))
-    adapted = maml_inner_loop(model, dict(model.named_parameters()), task.support_x, task.support_y, float(inner_lr), steps, first_order=True)
+    adapted = maml_inner_loop(
+        model,
+        dict(model.named_parameters()),
+        task.support_x,
+        task.support_y,
+        float(inner_lr),
+        steps,
+        first_order=True,
+        loss_fn=lambda pred, target: supervised_task_loss(pred, target, task.metadata),
+    )
     with torch.no_grad():
-        return float(F.mse_loss(functional_forward(model, adapted, task.query_x), task.query_y))
+        return float(supervised_task_loss(functional_forward(model, adapted, task.query_x), task.query_y, task.metadata))
 
 
 def _history_tensor(state: Dict[str, object]) -> torch.Tensor:

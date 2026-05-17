@@ -42,6 +42,7 @@ class CandidateGenerationRecord:
 class CandidateGeneratorConfig:
     max_candidates: int = 6
     max_program_length: int = 9
+    include_arc_candidates: bool = False
     lr_perturbations: Sequence[float] = (0.7, 0.85, 1.15, 1.3)
     mutation_methods: Sequence[str] = (
         "parameter_perturbation",
@@ -58,6 +59,7 @@ class CandidateGeneratorConfig:
         return {
             "max_candidates": self.max_candidates,
             "max_program_length": self.max_program_length,
+            "include_arc_candidates": self.include_arc_candidates,
             "lr_perturbations": list(self.lr_perturbations),
             "mutation_methods": list(self.mutation_methods),
         }
@@ -132,6 +134,75 @@ class CandidateGenerator:
                 )
             return out
 
+        if self.config.include_arc_candidates:
+            out.append(
+                (
+                    self._program(
+                        f"g{generation}_support_color_mapping",
+                        (PrimitiveStep("support_color_mapping"),),
+                        self._perturbed_params(best),
+                        best,
+                        generation,
+                    ),
+                    "symbolic_support_rule_mutation",
+                    "induce a support-only input-color to output-color rule for same-shape classification tasks",
+                    [best.program_id],
+                )
+            )
+            out.append(
+                (
+                    self._program(
+                        f"g{generation}_low_lr_multi_step",
+                        (
+                            PrimitiveStep("constant_lr"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                        ),
+                        self._perturbed_params(best, lr_scale=0.2),
+                        best,
+                        generation,
+                    ),
+                    "multi_step_lr_mutation",
+                    "try a lower learning-rate repeated support adaptation schedule selected only through validation traces",
+                    [best.program_id],
+                )
+            )
+            out.append(
+                (
+                    self._program(
+                        f"g{generation}_clipped_long_adaptation",
+                        (
+                            PrimitiveStep("gradient_norm_clipping", {"max_norm": 1.0}),
+                            PrimitiveStep("constant_lr"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                            PrimitiveStep("maml_step"),
+                        ),
+                        self._perturbed_params(best, lr_scale=4.0, clip_norm=1.0),
+                        best,
+                        generation,
+                    ),
+                    "adaptive_horizon_lr_mutation",
+                    "combine online step-size adaptation with gradient clipping and a longer support-only horizon",
+                    [best.program_id],
+                )
+            )
         out.append(
             (
                 self._program(

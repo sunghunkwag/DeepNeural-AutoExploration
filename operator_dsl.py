@@ -54,6 +54,7 @@ OBJECTIVE_PRIMITIVES = (
     "prediction_error_reduction",
     "uncertainty_penalty",
     "novelty_bonus",
+    "support_color_mapping",
 )
 SCHEDULE_PRIMITIVES = (
     "constant_lr",
@@ -87,6 +88,18 @@ def _fit(tensor: torch.Tensor, dim: int) -> torch.Tensor:
     if flat.numel() >= dim:
         return flat[:dim]
     return torch.cat([flat, torch.zeros(dim - flat.numel())])
+
+
+def supervised_task_loss(pred: torch.Tensor, target: torch.Tensor, metadata: Optional[Dict[str, object]] = None) -> torch.Tensor:
+    """Return the task loss used by executable operator programs."""
+
+    metadata = metadata or {}
+    if metadata.get("target_type") == "classification":
+        labels = target.reshape(-1).long()
+        if pred.ndim != 2:
+            raise ValueError("classification operator programs require [N, C] logits")
+        return F.cross_entropy(pred, labels)
+    return F.mse_loss(pred, target.float())
 
 
 @dataclass(frozen=True)
@@ -178,6 +191,7 @@ class ProgramExecutionDetails:
     objective_signal: float = 0.0
     behavior_signature: List[float] = field(default_factory=list)
     primitive_effects: Dict[str, float] = field(default_factory=dict)
+    prediction_override: Optional[torch.Tensor] = None
 
 
 class ProgramGenome:
@@ -239,12 +253,17 @@ class ProgramAdaptationOperator(AdaptationOperator):
         state.run()
         return state.adapted_params, state.details
 
+    def _before_loss(self, context: OperatorExecutionContext) -> float:
+        with torch.no_grad():
+            pred = context.model(context.task.query_x)
+            return float(supervised_task_loss(pred, context.task.query_y, getattr(context.task, "metadata", {})))
+
     def apply(self, gene: OperatorGene, context: OperatorExecutionContext) -> OperatorTrace:
         adapted, details = self.adapt_params(context)
         before = self._before_loss(context)
         with torch.no_grad():
-            pred = functional_forward(context.model, adapted, context.task.query_x)
-            after = float(F.mse_loss(pred, context.task.query_y))
+            pred = details.prediction_override if details.prediction_override is not None else functional_forward(context.model, adapted, context.task.query_x)
+            after = float(supervised_task_loss(pred, context.task.query_y, getattr(context.task, "metadata", {})))
         if not math.isfinite(after):
             raise FloatingPointError("operator program produced a non-finite query loss")
         return OperatorTrace(
@@ -298,7 +317,7 @@ class _ProgramState:
     def run(self) -> None:
         for step in self.program.primitive_sequence:
             getattr(self, f"_op_{step.name}")(step)
-        if not self.details.selected_lrs:
+        if not self.details.selected_lrs and self.details.prediction_override is None:
             self._gradient_step(self.current_lr)
         self.details.behavior_signature = [
             float(sum(self.details.selected_lrs)),
@@ -307,6 +326,7 @@ class _ProgramState:
             float(self.details.world_model_score),
             float(self.details.support_proxy_loss),
             float(self.details.objective_signal),
+            1.0 if self.details.prediction_override is not None else 0.0,
         ]
 
     def _retrieved_memory(self) -> List[Tuple[MemoryRecord, float]]:
@@ -319,7 +339,7 @@ class _ProgramState:
 
     def _support_loss(self) -> torch.Tensor:
         pred = functional_forward(self.context.model, self.adapted_params, self.context.task.support_x)
-        return F.mse_loss(pred, self.context.task.support_y) * float(self.loss_weight)
+        return supervised_task_loss(pred, self.context.task.support_y, getattr(self.context.task, "metadata", {})) * float(self.loss_weight)
 
     def _support_proxy_loss(self) -> torch.Tensor:
         sx = self.context.task.support_x
@@ -328,7 +348,7 @@ class _ProgramState:
             return self._support_loss()
         split = max(1, int(sx.shape[0] * 0.65))
         pred = functional_forward(self.context.model, self.adapted_params, sx[split:])
-        return F.mse_loss(pred, sy[split:])
+        return supervised_task_loss(pred, sy[split:], getattr(self.context.task, "metadata", {}))
 
     def _gradient_step(self, lr: float, *, proxy: bool = False) -> None:
         lr = _clamp(lr, 1e-5, 0.3)
@@ -471,6 +491,37 @@ class _ProgramState:
         self.current_lr = _clamp(self.current_lr * (1.0 + 0.03 * novelty), 1e-5, 0.3)
         self.details.objective_signal += float(novelty)
         self.details.primitive_effects["novelty_bonus"] = float(novelty)
+
+    def _op_support_color_mapping(self, step: PrimitiveStep) -> None:
+        if getattr(self.context.task, "metadata", {}).get("target_type") != "classification":
+            self.details.primitive_effects["support_color_mapping"] = 0.0
+            return
+        support_x = self.context.task.support_x.float().reshape(self.context.task.support_x.shape[0], -1)
+        query_x = self.context.task.query_x.float().reshape(self.context.task.query_x.shape[0], -1)
+        support_y = self.context.task.support_y.reshape(-1).long()
+        if support_x.shape[1] < 5 or query_x.shape[1] < 5 or support_y.numel() == 0:
+            self.details.primitive_effects["support_color_mapping"] = 0.0
+            return
+        input_colors = torch.clamp(torch.round(support_x[:, 4] * 9.0), 0, 9).long()
+        query_colors = torch.clamp(torch.round(query_x[:, 4] * 9.0), 0, 9).long()
+        global_counts = torch.bincount(torch.clamp(support_y, 0, 9), minlength=10).float()
+        global_default = int(torch.argmax(global_counts).item())
+        mapping: Dict[int, int] = {}
+        confidence: Dict[int, float] = {}
+        for color in range(10):
+            mask = input_colors == color
+            if bool(mask.any()):
+                counts = torch.bincount(torch.clamp(support_y[mask], 0, 9), minlength=10).float()
+                mapped = int(torch.argmax(counts).item())
+                mapping[color] = mapped
+                confidence[color] = float(counts.max().item() / counts.sum().clamp_min(1.0).item())
+        predictions = [mapping.get(int(color), int(color) if 0 <= int(color) <= 9 else global_default) for color in query_colors]
+        logits = torch.full((len(predictions), 10), -6.0, dtype=torch.float32, device=self.context.task.query_x.device)
+        for row, label in enumerate(predictions):
+            logits[row, int(label)] = 6.0 * confidence.get(int(query_colors[row]), 1.0)
+        self.details.prediction_override = logits
+        self.details.objective_signal += float(sum(confidence.values()) / max(1, len(confidence)))
+        self.details.primitive_effects["support_color_mapping"] = float(len(mapping))
 
     def _op_constant_lr(self, step: PrimitiveStep) -> None:
         self.current_lr = _clamp(float(step.args.get("lr", self.base_lr)), 1e-5, 0.3)
