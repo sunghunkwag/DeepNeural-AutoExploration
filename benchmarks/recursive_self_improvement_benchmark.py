@@ -91,9 +91,9 @@ def _make_config(state: Dict[str, object]) -> DNAXConfig:
     width = float(state.get("width_multiplier", 1.0))
     hidden = [max(8, int(round(16 * width))), max(8, int(round(16 * width)))]
     return DNAXConfig(
-        input_dim=int(state.get("input_dim", 1)),
+        input_dim=1,
         hidden_dims=hidden,
-        output_dim=int(state.get("output_dim", 1)),
+        output_dim=1,
         dropout_rate=0.0,
         spectral_norm=False,
         verbose=False,

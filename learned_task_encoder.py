@@ -140,12 +140,9 @@ def handcrafted_support_baseline_loss(tasks: Sequence[SyntheticTask]) -> float:
         y_mean = features[2]
         corr = features[4]
         slope_abs = features[5].clamp(max=3.0)
-        support_x = task.support_x.float().reshape(task.support_x.shape[0], -1)
-        query_x = task.query_x.float().reshape(task.query_x.shape[0], -1)
-        x_center = support_x.mean(dim=0, keepdim=True)
-        query_centered = (query_x - x_center).mean(dim=1, keepdim=True)
+        x_center = task.support_x.float().mean()
         # A crude signed local linear predictor from the old statistics.
-        pred = y_mean + corr.sign() * slope_abs * 0.25 * query_centered
+        pred = y_mean + corr.sign() * slope_abs * 0.25 * (task.query_x.float() - x_center)
         losses.append(float(F.mse_loss(pred, task.query_y.float())))
     return float(sum(losses) / max(1, len(losses)))
 
