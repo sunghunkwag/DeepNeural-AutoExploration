@@ -138,6 +138,48 @@ class CandidateGenerator:
             out.append(
                 (
                     self._program(
+                        f"g{generation}_support_local_pattern_mapping",
+                        (PrimitiveStep("support_local_pattern_mapping"),),
+                        self._perturbed_params(best),
+                        best,
+                        generation,
+                    ),
+                    "symbolic_local_pattern_rule_mutation",
+                    "induce a support-only local-neighborhood rule for same-shape ARC classification tasks",
+                    [best.program_id],
+                )
+            )
+            out.append(
+                (
+                    self._program(
+                        f"g{generation}_support_feature_lookup_mapping",
+                        (PrimitiveStep("support_feature_lookup_mapping", {"mode": "feature"}),),
+                        self._perturbed_params(best),
+                        best,
+                        generation,
+                    ),
+                    "symbolic_feature_lookup_rule_mutation",
+                    "induce a support-only full-feature lookup rule for repeated ARC cell patterns",
+                    [best.program_id],
+                )
+            )
+            out.append(
+                (
+                    self._program(
+                        f"g{generation}_support_position_color_mapping",
+                        (PrimitiveStep("support_feature_lookup_mapping", {"mode": "position_color"}),),
+                        self._perturbed_params(best),
+                        best,
+                        generation,
+                    ),
+                    "symbolic_position_color_rule_mutation",
+                    "induce a support-only position-and-color rule for aligned same-shape ARC grids",
+                    [best.program_id],
+                )
+            )
+            out.append(
+                (
+                    self._program(
                         f"g{generation}_support_color_mapping",
                         (PrimitiveStep("support_color_mapping"),),
                         self._perturbed_params(best),

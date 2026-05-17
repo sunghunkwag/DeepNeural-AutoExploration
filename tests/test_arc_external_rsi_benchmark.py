@@ -45,6 +45,8 @@ def test_arc_loader_uses_external_same_shape_tasks(tmp_path):
     assert len(loaded.tasks) == 8
     assert loaded.tasks[0].support_x.shape[1] == arc_benchmark.ARC_FEATURE_DIM
     assert loaded.tasks[0].metadata["source"] == arc_benchmark.ARC_REPO_URL
+    assert len(loaded.tasks[0].metadata["support_offsets"]) == 3
+    assert len(arc_benchmark._support_holdout_tasks(loaded.tasks[0])) == 2
 
 
 def test_arc_external_rsi_smoke_reports_baseline_to_evolved(tmp_path, monkeypatch):
@@ -80,3 +82,4 @@ def test_arc_external_rsi_smoke_reports_baseline_to_evolved(tmp_path, monkeypatc
     all_ids = task_ids["train"] + task_ids["validation"] + task_ids["hidden_validation"] + task_ids["test"]
     assert len(all_ids) == len(set(all_ids))
     assert "hidden validation gate used before held-out test scoring" in manifest["anti_cheat_checks_passed"]
+    assert manifest["generation_summaries"][0]["selector_guard"]["selected"] == "support_cv_per_task"

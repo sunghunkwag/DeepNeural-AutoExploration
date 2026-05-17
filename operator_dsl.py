@@ -55,6 +55,8 @@ OBJECTIVE_PRIMITIVES = (
     "uncertainty_penalty",
     "novelty_bonus",
     "support_color_mapping",
+    "support_local_pattern_mapping",
+    "support_feature_lookup_mapping",
 )
 SCHEDULE_PRIMITIVES = (
     "constant_lr",
@@ -522,6 +524,73 @@ class _ProgramState:
         self.details.prediction_override = logits
         self.details.objective_signal += float(sum(confidence.values()) / max(1, len(confidence)))
         self.details.primitive_effects["support_color_mapping"] = float(len(mapping))
+
+    def _op_support_local_pattern_mapping(self, step: PrimitiveStep) -> None:
+        self._support_lookup_mapping("local_pattern")
+
+    def _op_support_feature_lookup_mapping(self, step: PrimitiveStep) -> None:
+        self._support_lookup_mapping(str(step.args.get("mode", "feature")))
+
+    def _support_lookup_mapping(self, mode: str) -> None:
+        if getattr(self.context.task, "metadata", {}).get("target_type") != "classification":
+            self.details.primitive_effects[f"support_lookup_{mode}"] = 0.0
+            return
+        support_x = self.context.task.support_x.float().reshape(self.context.task.support_x.shape[0], -1)
+        query_x = self.context.task.query_x.float().reshape(self.context.task.query_x.shape[0], -1)
+        support_y = self.context.task.support_y.reshape(-1).long()
+        if support_x.shape[1] < 10 or query_x.shape[1] < 10 or support_y.numel() == 0:
+            self.details.primitive_effects[f"support_lookup_{mode}"] = 0.0
+            return
+
+        def _color(row: torch.Tensor, index: int) -> int:
+            return int(max(0, min(9, round(float(row[index] * 9.0)))))
+
+        def _key(row: torch.Tensor) -> Tuple[object, ...]:
+            color = _color(row, 4)
+            if mode == "local_pattern":
+                return tuple(_color(row, index) for index in (4, 6, 7, 8, 9))
+            if mode == "position_color":
+                return (round(float(row[0]), 4), round(float(row[1]), 4), color)
+            return tuple(round(float(value), 4) for value in row.tolist())
+
+        lookup_votes: Dict[Tuple[object, ...], Dict[int, int]] = {}
+        color_votes: Dict[int, Dict[int, int]] = {}
+        for row, target in zip(support_x, support_y):
+            label = int(max(0, min(9, int(target))))
+            key = _key(row)
+            color = _color(row, 4)
+            lookup_votes.setdefault(key, {})
+            lookup_votes[key][label] = lookup_votes[key].get(label, 0) + 1
+            color_votes.setdefault(color, {})
+            color_votes[color][label] = color_votes[color].get(label, 0) + 1
+
+        def _winner(votes: Dict[int, int]) -> Tuple[int, float]:
+            total = max(1, sum(votes.values()))
+            label, count = max(votes.items(), key=lambda item: (item[1], -item[0]))
+            return int(label), float(count / total)
+
+        predictions: List[int] = []
+        confidences: List[float] = []
+        hits = 0
+        for row in query_x:
+            key = _key(row)
+            color = _color(row, 4)
+            if key in lookup_votes:
+                label, confidence = _winner(lookup_votes[key])
+                hits += 1
+            elif color in color_votes:
+                label, confidence = _winner(color_votes[color])
+            else:
+                label, confidence = color, 0.5
+            predictions.append(label)
+            confidences.append(confidence)
+
+        logits = torch.full((len(predictions), 10), -6.0, dtype=torch.float32, device=self.context.task.query_x.device)
+        for row_index, (label, confidence) in enumerate(zip(predictions, confidences)):
+            logits[row_index, label] = 6.0 * max(0.5, min(1.0, confidence))
+        self.details.prediction_override = logits
+        self.details.objective_signal += float(sum(confidences) / max(1, len(confidences)))
+        self.details.primitive_effects[f"support_lookup_{mode}"] = float(hits / max(1, len(predictions)))
 
     def _op_constant_lr(self, step: PrimitiveStep) -> None:
         self.current_lr = _clamp(float(step.args.get("lr", self.base_lr)), 1e-5, 0.3)

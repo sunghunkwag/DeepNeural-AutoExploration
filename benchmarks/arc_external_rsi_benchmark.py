@@ -85,7 +85,7 @@ def _mode_config(mode: str) -> Dict[str, int | float]:
             "test": 4,
             "encoder_steps": 5,
             "controller_steps": 8,
-            "max_candidates": 4,
+            "max_candidates": 7,
             "timeout_seconds": 6.0,
             "max_grid_cells": 144,
         },
@@ -97,7 +97,7 @@ def _mode_config(mode: str) -> Dict[str, int | float]:
             "test": 5,
             "encoder_steps": 8,
             "controller_steps": 12,
-            "max_candidates": 5,
+            "max_candidates": 8,
             "timeout_seconds": 7.0,
             "max_grid_cells": 196,
         },
@@ -109,7 +109,7 @@ def _mode_config(mode: str) -> Dict[str, int | float]:
             "test": 8,
             "encoder_steps": 12,
             "controller_steps": 18,
-            "max_candidates": 6,
+            "max_candidates": 9,
             "timeout_seconds": 8.0,
             "max_grid_cells": 225,
         },
@@ -215,10 +215,16 @@ def _cap_support_cells(task_id: str, x: torch.Tensor, y: torch.Tensor, max_cells
 def _arc_payload_to_task(task_id: str, split: str, payload: Mapping[str, object]) -> SyntheticTask:
     support_x_parts: List[torch.Tensor] = []
     support_y_parts: List[torch.Tensor] = []
+    support_shapes: List[Tuple[int, int]] = []
+    support_outputs: List[List[List[int]]] = []
+    support_offsets = [0]
     for pair in payload["train"]:  # type: ignore[index]
-        x, y, _, _ = _pair_to_xy(pair)
+        x, y, shape, output_grid = _pair_to_xy(pair)
         support_x_parts.append(x)
         support_y_parts.append(y)
+        support_shapes.append(shape)
+        support_outputs.append(output_grid)
+        support_offsets.append(support_offsets[-1] + int(x.shape[0]))
     query_x_parts: List[torch.Tensor] = []
     query_y_parts: List[torch.Tensor] = []
     query_shapes: List[Tuple[int, int]] = []
@@ -245,6 +251,9 @@ def _arc_payload_to_task(task_id: str, split: str, payload: Mapping[str, object]
         metadata={
             "source": ARC_REPO_URL,
             "source_task_id": task_id,
+            "support_shapes": support_shapes,
+            "support_offsets": support_offsets,
+            "support_expected_outputs": support_outputs,
             "query_shapes": query_shapes,
             "query_offsets": offsets,
             "expected_outputs": expected_outputs,
@@ -373,16 +382,20 @@ def _evaluate_arc_program_set(
     selected: List[str] = []
     task_results: List[Dict[str, object]] = []
     for task in tasks:
-        program = _select_program(
-            genome,
-            task,
-            state,
-            encoder,
-            memory,
-            meta_controller=meta_controller,
-            random_controller=random_controller,
-            selector_kind=selector_kind,
-        )
+        support_cv_info: Dict[str, object] = {}
+        if selector_kind == "support_cv":
+            program, support_cv_info = _select_support_cv_program(task, state, encoder, memory, genome, world_model)
+        else:
+            program = _select_program(
+                genome,
+                task,
+                state,
+                encoder,
+                memory,
+                meta_controller=meta_controller,
+                random_controller=random_controller,
+                selector_kind=selector_kind,
+            )
         context = _make_contexts([task], state, encoder, memory, world_model)[0]
         operator = compile_operator_program(program)
         adapted, details = operator.adapt_params(context)
@@ -400,6 +413,7 @@ def _evaluate_arc_program_set(
                 "program_id": program.program_id,
                 "query_loss": loss,
                 "behavior_signature": list(details.behavior_signature),
+                "support_cv": support_cv_info,
             }
         )
     return {
@@ -421,6 +435,81 @@ def _evaluate_arc_program_direct(
 ) -> Dict[str, object]:
     genome = ProgramGenome([program], active_program_id=program.program_id)
     return _evaluate_arc_program_set(tasks, state, encoder, memory, genome, selector_kind="active", world_model=world_model)
+
+
+def _support_holdout_tasks(task: SyntheticTask) -> List[SyntheticTask]:
+    offsets = [int(value) for value in task.metadata.get("support_offsets", [])]  # type: ignore[arg-type]
+    shapes = [tuple(value) for value in task.metadata.get("support_shapes", [])]  # type: ignore[arg-type]
+    outputs = list(task.metadata.get("support_expected_outputs", []))  # type: ignore[arg-type]
+    if len(offsets) < 3 or len(shapes) != len(offsets) - 1:
+        return []
+    out: List[SyntheticTask] = []
+    for holdout in range(len(offsets) - 1):
+        support_indices: List[torch.Tensor] = []
+        for index in range(len(offsets) - 1):
+            if index == holdout:
+                continue
+            support_indices.append(torch.arange(offsets[index], offsets[index + 1], dtype=torch.long))
+        if not support_indices:
+            continue
+        train_index = torch.cat(support_indices)
+        start, end = offsets[holdout], offsets[holdout + 1]
+        query_len = end - start
+        out.append(
+            SyntheticTask(
+                task_id=f"{task.task_id}-support-holdout-{holdout}",
+                family=task.family,
+                split="validation",
+                support_x=task.support_x.index_select(0, train_index),
+                support_y=task.support_y.index_select(0, train_index),
+                query_x=task.support_x[start:end],
+                query_y=task.support_y[start:end],
+                metadata={
+                    **task.metadata,
+                    "query_shapes": [shapes[holdout]],
+                    "query_offsets": [0, query_len],
+                    "expected_outputs": [outputs[holdout]] if holdout < len(outputs) else [],
+                    "assigned_split": "support_holdout",
+                    "contains_query_targets": False,
+                },
+            )
+        )
+    return out
+
+
+def _select_support_cv_program(
+    task: SyntheticTask,
+    state: Dict[str, object],
+    encoder: LearnedTaskEncoder,
+    memory,
+    genome: ProgramGenome,
+    world_model=None,
+) -> Tuple[OperatorProgram, Dict[str, object]]:
+    holdouts = _support_holdout_tasks(task)
+    if not holdouts:
+        return genome.active_program(), {"selected_program_id": genome.active_program_id, "support_cv_available": False}
+    scored: List[Tuple[float, float, float, str, OperatorProgram, Dict[str, object]]] = []
+    for program in genome.accepted_programs():
+        metrics = _evaluate_arc_program_direct(program, holdouts, state, encoder, memory, world_model)
+        scored.append(
+            (
+                float(metrics["exact_task_accuracy"]),
+                float(metrics["cell_accuracy"]),
+                -float(metrics["mean_loss"]),
+                program.program_id,
+                program,
+                metrics,
+            )
+        )
+    exact_score, cell_score, loss_score, program_id, program, metrics = max(scored, key=lambda item: item[:4])
+    return program, {
+        "selected_program_id": program_id,
+        "support_cv_available": True,
+        "support_cv_exact_task_accuracy": exact_score,
+        "support_cv_cell_accuracy": cell_score,
+        "support_cv_loss": -loss_score,
+        "support_cv_metrics": metrics,
+    }
 
 
 def _guarded_arc_program_id(
@@ -721,6 +810,11 @@ def _run_seed(seed: int, mode: str, *, arc_data_dir: str | Path, allow_download:
             world_model,
         )
         genome.active_program_id = guarded_program_id
+        selector_guard = {
+            "selected": "support_cv_per_task",
+            "global_guard": selector_guard,
+            "support_cv_policy": "choose accepted program per held-out task using leave-one-demonstration-out support accuracy",
+        }
         evolved_metrics = _evaluate_arc_program_set(
             test_tasks,
             state,
@@ -728,12 +822,12 @@ def _run_seed(seed: int, mode: str, *, arc_data_dir: str | Path, allow_download:
             memory,
             genome,
             meta_controller=post_controller,
-            selector_kind="active",
+            selector_kind="support_cv",
             world_model=world_model,
         )
         fixed_metrics = _evaluate_arc_program_set(test_tasks, state, encoder, memory, ProgramGenome.default(), selector_kind="fixed", world_model=world_model)
-        shuffled_metrics = _evaluate_arc_program_set(test_tasks, state, encoder, _shuffled_memory(memory), genome, meta_controller=post_controller, selector_kind="active", world_model=world_model)
-        wrong_world_metrics = _evaluate_arc_program_set(test_tasks, state, encoder, memory, genome, meta_controller=post_controller, selector_kind="active", world_model=WrongWorldModel(8, 6))
+        shuffled_metrics = _evaluate_arc_program_set(test_tasks, state, encoder, _shuffled_memory(memory), genome, meta_controller=post_controller, selector_kind="support_cv", world_model=world_model)
+        wrong_world_metrics = _evaluate_arc_program_set(test_tasks, state, encoder, memory, genome, meta_controller=post_controller, selector_kind="support_cv", world_model=WrongWorldModel(8, 6))
         random_controller = RandomController(post_actions, seed=seed + 120 + generation)
         random_metrics = _evaluate_arc_program_set(test_tasks, state, encoder, memory, genome, random_controller=random_controller, selector_kind="random", world_model=world_model)
         evolved_metrics_by_generation.append(evolved_metrics)
