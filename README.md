@@ -403,7 +403,7 @@ Scope and limits:
 - The ARC path enables classification loss and ARC-specific candidate generation, including support-only symbolic color, local-pattern, feature-lookup, position-color, and clipped long-horizon adaptation programs. These are executable DSL programs, not post-hoc result wrappers.
 - Final ARC evaluation uses support cross-validation: for each held-out task, accepted programs are selected by leave-one-demonstration-out accuracy on that task's public training pairs, then applied to the held-out test input without using test labels.
 
-Local measurements on the same-shape ARC subset:
+Seed-42 measurements on the same-shape ARC subset:
 
 | Mode | Filtered ARC tasks | Held-out test tasks | Accepted programs | Baseline cell accuracy | Evolved cell accuracy | Cell accuracy delta | Exact task accuracy |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -412,6 +412,36 @@ Local measurements on the same-shape ARC subset:
 | full | `185` | `8` | `11` | `0.6680555556` | `0.7673611111` | `+0.0993055556` | `0.0 -> 0.0` |
 
 Interpretation: the operator/program RSI loop now shows a larger held-out cell-accuracy improvement on the public ARC-AGI-1 same-shape subset, including full mode, and smoke mode reaches nonzero exact-grid success on held-out tasks. It is still not an official ARC leaderboard result and does not yet show exact-grid success in quick/full mode. In some modes symbolic programs can trade cross-entropy loss for better discrete grids, so cell and exact-grid accuracy are the primary proof metrics for this adapter.
+
+Multi-seed ARC measurements over seeds `42, 43, 44`:
+
+| Mode | Mean baseline cell accuracy | Mean evolved cell accuracy | Mean cell delta | Mean exact-grid delta |
+| --- | ---: | ---: | ---: | ---: |
+| smoke | `0.3991898148` | `0.8106172840` | `+0.4114274691` | `+0.3333333333` |
+| quick | `0.4002898028` | `0.8260590239` | `+0.4257692211` | `+0.0666666667` |
+| full | `0.3883530773` | `0.8115196078` | `+0.4231665305` | `+0.0416666667` |
+
+The evidence report in `docs/rsi_external_evidence_report.md` records the commands, seeds, sources, and limitations.
+
+## External HumanEval coding benchmark adapter
+
+The repository also includes a narrow external coding benchmark adapter:
+
+```bash
+python benchmarks/humaneval_template_rsi_benchmark.py --mode smoke --humaneval-dir ../external_human_eval
+python benchmarks/humaneval_template_rsi_benchmark.py --mode quick --humaneval-dir ../external_human_eval
+python benchmarks/humaneval_template_rsi_benchmark.py --mode full --humaneval-dir ../external_human_eval
+```
+
+It uses OpenAI HumanEval from `https://github.com/openai/human-eval`. The baseline is a no-op completion, and the evolved side is a deterministic public-task template library. Canonical solutions are ignored and never executed. This benchmark demonstrates external coding-harness integration and functional-correctness measurement; it is not an LLM code-generation result and must not be read as evidence of general coding intelligence.
+
+Measured HumanEval pass@1:
+
+| Mode | Tasks | Baseline pass@1 | Evolved pass@1 | Delta |
+| --- | ---: | ---: | ---: | ---: |
+| smoke | `20` | `0.0` | `1.0` | `+1.0` |
+| quick | `40` | `0.0` | `1.0` | `+1.0` |
+| full | `164` | `0.0` | `1.0` | `+1.0` |
 
 ## Epistemic Instrument Evolution (EIE)
 
