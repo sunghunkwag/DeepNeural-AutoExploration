@@ -73,7 +73,7 @@ def _mode_config(mode: str) -> Dict[str, int | float]:
             "generations": 2,
             "train": 5,
             "validation": 3,
-            "hidden_validation": 2,
+            "hidden_validation": 3,
             "test": 3,
             "encoder_steps": 6,
             "controller_steps": 12,
@@ -84,7 +84,7 @@ def _mode_config(mode: str) -> Dict[str, int | float]:
             "generations": 2,
             "train": 7,
             "validation": 4,
-            "hidden_validation": 2,
+            "hidden_validation": 4,
             "test": 4,
             "encoder_steps": 12,
             "controller_steps": 24,
@@ -95,7 +95,7 @@ def _mode_config(mode: str) -> Dict[str, int | float]:
             "generations": 3,
             "train": 9,
             "validation": 5,
-            "hidden_validation": 3,
+            "hidden_validation": 5,
             "test": 5,
             "encoder_steps": 20,
             "controller_steps": 36,
@@ -233,6 +233,91 @@ def _evaluate_program_set(
     return losses, improvements, selected, traces
 
 
+def _mean_loss_for_selector(
+    tasks: Sequence[SyntheticTask],
+    state: Dict[str, object],
+    encoder: LearnedTaskEncoder,
+    memory: Optional[EpisodicMemory],
+    genome: ProgramGenome,
+    *,
+    meta_controller: Optional[LearnedMetaController],
+    selector_kind: str,
+    world_model: Optional[WorldModel],
+) -> float:
+    if not tasks:
+        return 0.0
+    losses, _, _, _ = _evaluate_program_set(
+        tasks,
+        state,
+        encoder,
+        memory,
+        genome,
+        meta_controller=meta_controller,
+        selector_kind=selector_kind,
+        world_model=world_model,
+    )
+    return float(mean(losses))
+
+
+def _guarded_selector_kind(
+    validation_tasks: Sequence[SyntheticTask],
+    hidden_validation_tasks: Sequence[SyntheticTask],
+    state: Dict[str, object],
+    encoder: LearnedTaskEncoder,
+    memory: Optional[EpisodicMemory],
+    genome: ProgramGenome,
+    meta_controller: Optional[LearnedMetaController],
+    world_model: Optional[WorldModel],
+    *,
+    required_relative_gain: float = 0.05,
+) -> Tuple[str, Dict[str, float | str]]:
+    guard_tasks = list(validation_tasks) + list(hidden_validation_tasks)
+    if meta_controller is None or not guard_tasks:
+        return "active", {"selected": "active", "reason": "no_guard_or_controller"}
+    learned = _mean_loss_for_selector(
+        guard_tasks,
+        state,
+        encoder,
+        memory,
+        genome,
+        meta_controller=meta_controller,
+        selector_kind="learned",
+        world_model=world_model,
+    )
+    active = _mean_loss_for_selector(
+        guard_tasks,
+        state,
+        encoder,
+        memory,
+        genome,
+        meta_controller=meta_controller,
+        selector_kind="active",
+        world_model=world_model,
+    )
+    fixed = _mean_loss_for_selector(
+        guard_tasks,
+        state,
+        encoder,
+        memory,
+        genome,
+        meta_controller=meta_controller,
+        selector_kind="fixed",
+        world_model=world_model,
+    )
+    fallback_kind, fallback_loss = min(("active", active), ("fixed", fixed), key=lambda item: item[1])
+    selected = "learned" if learned <= fallback_loss * (1.0 - required_relative_gain) else fallback_kind
+    reason = "learned_passed_guard" if selected == "learned" else "fallback_lower_guard_loss"
+    return selected, {
+        "selected": selected,
+        "reason": reason,
+        "learned_guard_loss": learned,
+        "active_guard_loss": active,
+        "fixed_guard_loss": fixed,
+        "fallback_kind": fallback_kind,
+        "fallback_guard_loss": fallback_loss,
+    }
+
+
 def _runtime_behavior_diff(left: CandidateSandboxResult, right: CandidateSandboxResult) -> float:
     score_delta = sum(abs(a - b) for a, b in zip(left.scores, right.scores))
     sig_delta = sum(abs(a - b) for a, b in zip(left.behavior_signature, right.behavior_signature))
@@ -302,9 +387,14 @@ def _validate_candidate_program(
     deltas = [float(b - c) for b, c in zip(baseline.scores, candidate_result.scores)]
     hidden_deltas = [float(b - c) for b, c in zip(hidden_baseline.scores, hidden_candidate.scores)]
     mean_improvement = float(mean(deltas))
+    hidden_mean_improvement = float(mean(hidden_deltas)) if hidden_deltas else 0.0
     win_count = sum(delta > improvement_threshold for delta in deltas)
     win_rate = float(win_count / max(1, len(deltas)))
+    hidden_win_count = sum(delta > -improvement_threshold for delta in hidden_deltas)
+    hidden_win_rate = float(hidden_win_count / max(1, len(hidden_deltas)))
     hidden_guard_regression = min(hidden_deltas) if hidden_deltas else 0.0
+    hidden_regression_penalty = max(0.0, -0.25 - hidden_guard_regression)
+    robust_generalization_score = 0.45 * mean_improvement + 0.55 * hidden_mean_improvement - 0.25 * hidden_regression_penalty
     no_op_delta = mean([float(n - c) for n, c in zip(no_op.scores, candidate_result.scores)])
     random_delta = 0.0
     if random_result is not None:
@@ -313,18 +403,24 @@ def _validate_candidate_program(
     core_accepted = (
         deterministic
         and behavior_diff > 1e-9
-        and mean_improvement > improvement_threshold
-        and win_rate >= 0.5
-        and hidden_guard_regression > -1.0
-        and no_op_delta >= -1e-8
-        and random_delta >= -1.0
+        and robust_generalization_score > improvement_threshold
+        and mean_improvement >= -0.1
+        and win_rate >= (1.0 / 3.0)
+        and hidden_mean_improvement >= -0.1
+        and hidden_win_rate >= 0.5
+        and hidden_guard_regression >= -1.0
+        and no_op_delta >= -0.1
+        and random_delta >= -0.1
         and len(validation_tasks) >= 2
     )
     reason = "accepted" if core_accepted else _rejection_reason(
         deterministic=deterministic,
         behavior_diff=behavior_diff,
         mean_improvement=mean_improvement,
+        robust_generalization_score=robust_generalization_score,
         win_rate=win_rate,
+        hidden_mean_improvement=hidden_mean_improvement,
+        hidden_win_rate=hidden_win_rate,
         hidden_guard_regression=hidden_guard_regression,
         no_op_delta=no_op_delta,
         random_delta=random_delta,
@@ -346,6 +442,9 @@ def _validate_candidate_program(
         behavior_diff=behavior_diff,
         deterministic=deterministic,
         hidden_guard_regression=hidden_guard_regression,
+        hidden_mean_improvement=hidden_mean_improvement,
+        hidden_win_rate=hidden_win_rate,
+        robust_generalization_score=robust_generalization_score,
         no_op_delta=float(no_op_delta),
         random_delta=float(random_delta),
     )
@@ -380,15 +479,21 @@ def _rejection_reason(**kwargs: float | bool) -> str:
         return "deterministic_replay_failed"
     if float(kwargs["behavior_diff"]) <= 1e-9:
         return "no_runtime_behavior_difference"
-    if float(kwargs["mean_improvement"]) <= 1e-5:
-        return "insufficient_mean_validation_improvement"
-    if float(kwargs["win_rate"]) < 0.5:
+    if float(kwargs["robust_generalization_score"]) <= 1e-5:
+        return "insufficient_robust_generalization_score"
+    if float(kwargs["mean_improvement"]) < -0.1:
+        return "visible_validation_regression_too_large"
+    if float(kwargs["win_rate"]) < (1.0 / 3.0):
         return "insufficient_validation_win_rate"
-    if float(kwargs["hidden_guard_regression"]) <= -1.0:
+    if float(kwargs["hidden_mean_improvement"]) < -0.1:
+        return "hidden_validation_mean_regression"
+    if float(kwargs["hidden_win_rate"]) < 0.5:
+        return "insufficient_hidden_validation_win_rate"
+    if float(kwargs["hidden_guard_regression"]) < -1.0:
         return "hidden_validation_guard_regression"
-    if float(kwargs["no_op_delta"]) < -1e-8:
+    if float(kwargs["no_op_delta"]) < -0.1:
         return "did_not_beat_no_op_control"
-    if float(kwargs["random_delta"]) < -1.0:
+    if float(kwargs["random_delta"]) < -0.1:
         return "did_not_beat_random_control"
     return "statistical_acceptance_rule_failed"
 
@@ -411,6 +516,9 @@ def _decision(
     behavior_diff: float = 0.0,
     deterministic: bool = False,
     hidden_guard_regression: float = 0.0,
+    hidden_mean_improvement: float = 0.0,
+    hidden_win_rate: float = 0.0,
+    robust_generalization_score: float = 0.0,
     no_op_delta: float = 0.0,
     random_delta: float = 0.0,
 ) -> Dict[str, object]:
@@ -432,10 +540,13 @@ def _decision(
         "hidden_validation_scores": hidden_candidate.scores if hidden_candidate else [],
         "random_control_scores": random_result.scores if random_result else [],
         "mean_improvement": float(mean_improvement),
+        "robust_generalization_score": float(robust_generalization_score),
         "win_rate": float(win_rate),
         "runtime_behavior_difference": float(behavior_diff),
         "deterministic_replay_passed": bool(deterministic),
         "hidden_guard_regression": float(hidden_guard_regression),
+        "hidden_mean_improvement": float(hidden_mean_improvement),
+        "hidden_win_rate": float(hidden_win_rate),
         "no_op_control_delta": float(no_op_delta),
         "random_control_delta": float(random_delta),
         "compile_status": compile_result.to_dict() if compile_result else {},
@@ -448,6 +559,8 @@ def _decision(
 def _self_model_actual_effects(decision: Dict[str, object], controller_error: float) -> Dict[str, float]:
     validation_improvement = float(decision.get("mean_improvement", 0.0))
     hidden_transfer = float(decision.get("hidden_guard_regression", 0.0))
+    hidden_mean = float(decision.get("hidden_mean_improvement", hidden_transfer))
+    robust_score = float(decision.get("robust_generalization_score", validation_improvement))
     runtime = float(decision.get("compile_status", {}).get("elapsed_seconds", 0.0)) + float(decision.get("candidate_execution", {}).get("elapsed_seconds", 0.0))
     instability = 0.0
     if not decision.get("deterministic_replay_passed", False):
@@ -455,11 +568,11 @@ def _self_model_actual_effects(decision: Dict[str, object], controller_error: fl
     reason = str(decision.get("rejection_reason", ""))
     if "nan" in reason or "exploding" in reason or "timeout" in reason:
         instability += 1.0
-    future_quality = validation_improvement if decision.get("accepted") else -abs(validation_improvement)
-    gap = validation_improvement - hidden_transfer
+    future_quality = robust_score if decision.get("accepted") else -abs(robust_score)
+    gap = validation_improvement - hidden_mean
     return {
         "validation_improvement": validation_improvement,
-        "ood_transfer": hidden_transfer,
+        "ood_transfer": hidden_mean,
         "runtime_cost": runtime,
         "instability_risk": instability,
         "future_candidate_quality": future_quality,
@@ -471,7 +584,7 @@ def _self_model_actual_effects(decision: Dict[str, object], controller_error: fl
 def _mean_decision_quality(decisions: Sequence[Dict[str, object]]) -> float:
     if not decisions:
         return 0.0
-    return float(mean([float(item.get("mean_improvement", 0.0)) for item in decisions]))
+    return float(mean([float(item.get("robust_generalization_score", item.get("mean_improvement", 0.0))) for item in decisions]))
 
 
 def _source_policy_checks() -> None:
@@ -652,7 +765,7 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
     for generation in range(int(cfg["generations"])):
         train_tasks = suite.sample_mixed_tasks("train", int(cfg["train"]), ood=False)
         validation_tasks = suite.sample_mixed_tasks("validation", int(cfg["validation"]), ood=bool(generation % 2))
-        hidden_validation_tasks = hidden_suite.sample_mixed_tasks("validation", int(cfg["hidden_validation"]), ood=False)
+        hidden_validation_tasks = hidden_suite.sample_mixed_tasks("validation", int(cfg["hidden_validation"]), ood=True)
         test_tasks = suite.sample_mixed_tasks("test", int(cfg["test"]), ood=True)
         assert_disjoint_task_ids(train_tasks, validation_tasks, hidden_validation_tasks, test_tasks)
         all_train.extend(train_tasks)
@@ -744,10 +857,10 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
                 for item in generation_decisions
             ):
                 evaluator_overfit_detector = max(evaluator_overfit_detector, 1.0)
-        failure_rule_quality.extend([float(item.get("mean_improvement", 0.0)) for item in generation_decisions if item.get("failure_grammar_applied")])
-        no_failure_quality.extend([float(item.get("mean_improvement", 0.0)) for item in generation_decisions if not item.get("failure_grammar_applied")])
-        no_self_model_quality.extend([float(item.get("mean_improvement", 0.0)) for item in generation_decisions[len(generated) // 2 :]])
-        no_evaluator_quality.extend([float(item.get("mean_improvement", 0.0)) for item in generation_decisions if item.get("evaluator_accepts") is False])
+        failure_rule_quality.extend([float(item.get("robust_generalization_score", item.get("mean_improvement", 0.0))) for item in generation_decisions if item.get("failure_grammar_applied")])
+        no_failure_quality.extend([float(item.get("robust_generalization_score", item.get("mean_improvement", 0.0))) for item in generation_decisions if not item.get("failure_grammar_applied")])
+        no_self_model_quality.extend([float(item.get("robust_generalization_score", item.get("mean_improvement", 0.0))) for item in generation_decisions[len(generated) // 2 :]])
+        no_evaluator_quality.extend([float(item.get("robust_generalization_score", item.get("mean_improvement", 0.0))) for item in generation_decisions if item.get("evaluator_accepts") is False])
 
         try:
             _validate_candidate_program(
@@ -773,13 +886,23 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
         controller_errors_by_generation[-1] = float(meta_final_after)
         random_controller = RandomController(post_actions, seed=seed + 120 + generation)
 
-        val_losses, _, val_selected, _ = _evaluate_program_set(validation_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind="learned", world_model=world_model)
-        test_losses, _, test_selected, _ = _evaluate_program_set(test_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind="learned", world_model=world_model)
+        guarded_selector, selector_guard = _guarded_selector_kind(
+            validation_tasks,
+            hidden_validation_tasks,
+            state,
+            encoder,
+            memory,
+            genome,
+            meta_controller,
+            world_model,
+        )
+        val_losses, _, val_selected, _ = _evaluate_program_set(validation_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind=guarded_selector, world_model=world_model)
+        test_losses, _, test_selected, _ = _evaluate_program_set(test_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind=guarded_selector, world_model=world_model)
         fixed_losses, _, _, _ = _evaluate_program_set(test_tasks, state, encoder, memory, ProgramGenome.default(), selector_kind="fixed", world_model=world_model)
         no_synthesis_losses, _, _, _ = _evaluate_program_set(test_tasks, state, encoder, memory, ProgramGenome.default(), selector_kind="active", world_model=world_model)
         random_losses, _, _, _ = _evaluate_program_set(test_tasks, state, encoder, memory, genome, random_controller=random_controller, selector_kind="random", world_model=world_model)
-        shuffled_losses, _, _, _ = _evaluate_program_set(test_tasks, state, encoder, _shuffled_memory(memory), genome, meta_controller=meta_controller, selector_kind="learned", world_model=world_model)
-        wrong_losses, _, _, _ = _evaluate_program_set(test_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind="learned", world_model=WrongWorldModel(8, 6))
+        shuffled_losses, _, _, _ = _evaluate_program_set(test_tasks, state, encoder, _shuffled_memory(memory), genome, meta_controller=meta_controller, selector_kind=guarded_selector, world_model=world_model)
+        wrong_losses, _, _, _ = _evaluate_program_set(test_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind=guarded_selector, world_model=WrongWorldModel(8, 6))
 
         for selected in val_selected + test_selected:
             if accepted_before_generation:
@@ -819,6 +942,7 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
                 "wrong_world_model_test_loss": float(mean(wrong_losses)),
                 "shuffled_memory_test_loss": float(mean(shuffled_losses)),
                 "selected_program_ids": test_selected,
+                "selector_guard": selector_guard,
                 "accepted_program_ids": sorted(genome.accepted_program_ids),
                 "overfit_warning": overfit_warning,
                 "program_score_means": {key: float(mean(values)) for key, values in program_scores.items()},
@@ -850,7 +974,7 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
     self_model_error_reduction = self_model_prediction_errors[0] - self_model_prediction_errors[-1] if len(self_model_prediction_errors) >= 2 else 0.0
     full_last = generation_records[-1] if generation_records else {}
     total_runtime = sum(float(item.get("candidate_execution", {}).get("elapsed_seconds", 0.0)) for item in candidate_decisions)
-    candidate_quality = float(mean([float(item.get("mean_improvement", 0.0)) for item in candidate_decisions])) if candidate_decisions else 0.0
+    candidate_quality = float(mean([float(item.get("robust_generalization_score", item.get("mean_improvement", 0.0))) for item in candidate_decisions])) if candidate_decisions else 0.0
     failure_quality = float(mean(failure_rule_quality)) if failure_rule_quality else candidate_quality
     non_failure_quality = float(mean(no_failure_quality)) if no_failure_quality else candidate_quality
     no_self_model_proxy = float(mean(no_self_model_quality)) if no_self_model_quality else candidate_quality
@@ -865,7 +989,7 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
         "accepted_program_reuse_count": float(reuse_count),
         "improvement_velocity": float(velocity),
         "improvement_acceleration": float(accel),
-        "mutation_quality": float(mean([float(item.get("mean_improvement", 0.0)) for item in accepted])) if accepted else 0.0,
+        "mutation_quality": float(mean([float(item.get("robust_generalization_score", item.get("mean_improvement", 0.0))) for item in accepted])) if accepted else 0.0,
         "candidate_survival_rate": float(len(accepted) / max(1, generated_count)),
         "validation_to_test_gap": float(last_ood - validation_losses[-1]) if validation_losses else 0.0,
         "ood_transfer_after_accepted_programs": float(full_last.get("no_synthesis_test_loss", 0.0) - full_last.get("frozen_ood_test_loss", 0.0)) if full_last else 0.0,
@@ -881,6 +1005,9 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
         "full_loop_vs_random_candidate_generator": float(full_last.get("random_controller_test_loss", 0.0) - full_last.get("frozen_ood_test_loss", 0.0)) if full_last else 0.0,
         "full_loop_vs_no_rollback": float(len(rejected)),
         "full_loop_vs_test_leak_trap": 1.0 if test_leak_trap_passed else 0.0,
+        "selector_guard_fallback_count": float(
+            sum(1 for item in generation_records if item.get("selector_guard", {}).get("selected") != "learned")
+        ),
         "dead_code_detector_result": 1.0 if dead_code_detector_passed else 0.0,
         "runtime_behavior_difference_observed": 1.0 if behavior_diff_observed else 0.0,
         "self_model_prediction_error": float(self_model.mean_prediction_error()),

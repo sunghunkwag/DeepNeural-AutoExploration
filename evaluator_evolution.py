@@ -93,7 +93,7 @@ class EvaluatorGenome:
         new_ranking = _ranking(new_scores)
         ranking_changed = old_ranking != new_ranking
         score_delta = sum(new_scores) - sum(old_scores)
-        accepted = bool(adversarial["passed"] and ranking_changed and score_delta > -10.0)
+        accepted = bool(adversarial["passed"] and (ranking_changed or score_delta > 0.0) and score_delta > -10.0)
         status = "probation" if accepted else "rejected"
         decision = {
             "evaluator_id": candidate.evaluator_id,

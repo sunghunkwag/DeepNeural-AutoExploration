@@ -367,6 +367,91 @@ def _evaluate_tasks_operator(
     return losses, improvements, selected_ids, traces
 
 
+def _mean_loss_for_selector(
+    tasks: Sequence[SyntheticTask],
+    state: Dict[str, object],
+    encoder: LearnedTaskEncoder,
+    memory: Optional[EpisodicMemory],
+    genome: OperatorGenome,
+    *,
+    meta_controller: Optional[LearnedMetaController],
+    selector_kind: str,
+    world_model: Optional[WorldModel] = None,
+) -> float:
+    if not tasks:
+        return 0.0
+    losses, _, _, _ = _evaluate_tasks_operator(
+        tasks,
+        state,
+        encoder,
+        memory,
+        genome,
+        meta_controller=meta_controller,
+        selector_kind=selector_kind,
+        world_model=world_model,
+    )
+    return float(mean(losses))
+
+
+def _guarded_selector_kind(
+    validation_tasks: Sequence[SyntheticTask],
+    hidden_validation_tasks: Sequence[SyntheticTask],
+    state: Dict[str, object],
+    encoder: LearnedTaskEncoder,
+    memory: Optional[EpisodicMemory],
+    genome: OperatorGenome,
+    meta_controller: Optional[LearnedMetaController],
+    world_model: Optional[WorldModel],
+    *,
+    required_relative_gain: float = 0.05,
+) -> Tuple[str, Dict[str, float | str]]:
+    guard_tasks = list(validation_tasks) + list(hidden_validation_tasks)
+    if meta_controller is None or not guard_tasks:
+        return "active", {"selected": "active", "reason": "no_guard_or_controller"}
+    learned = _mean_loss_for_selector(
+        guard_tasks,
+        state,
+        encoder,
+        memory,
+        genome,
+        meta_controller=meta_controller,
+        selector_kind="learned",
+        world_model=world_model,
+    )
+    active = _mean_loss_for_selector(
+        guard_tasks,
+        state,
+        encoder,
+        memory,
+        genome,
+        meta_controller=meta_controller,
+        selector_kind="active",
+        world_model=world_model,
+    )
+    fixed = _mean_loss_for_selector(
+        guard_tasks,
+        state,
+        encoder,
+        memory,
+        genome,
+        meta_controller=meta_controller,
+        selector_kind="fixed",
+        world_model=world_model,
+    )
+    fallback_kind, fallback_loss = min(("active", active), ("fixed", fixed), key=lambda item: item[1])
+    selected = "learned" if learned <= fallback_loss * (1.0 - required_relative_gain) else fallback_kind
+    reason = "learned_passed_guard" if selected == "learned" else "fallback_lower_guard_loss"
+    return selected, {
+        "selected": selected,
+        "reason": reason,
+        "learned_guard_loss": learned,
+        "active_guard_loss": active,
+        "fixed_guard_loss": fixed,
+        "fallback_kind": fallback_kind,
+        "fallback_guard_loss": fallback_loss,
+    }
+
+
 def _evaluate_gene_on_tasks(
     gene: OperatorGene,
     tasks: Sequence[SyntheticTask],
@@ -390,21 +475,38 @@ def _validate_operator_candidate(
     *,
     generation: int,
     seed: int,
+    hidden_validation_tasks: Sequence[SyntheticTask] | None = None,
     improvement_threshold: float = 1e-4,
 ) -> Dict[str, object]:
+    hidden_validation_tasks = list(hidden_validation_tasks or validation_tasks)
     if not validation_tasks:
         raise ValueError("validation_tasks are required for operator mutation acceptance")
-    if any(task.split == "test" for task in validation_tasks):
+    if any(task.split == "test" for task in validation_tasks) or any(task.split == "test" for task in hidden_validation_tasks):
         raise ValueError("test tasks cannot be used for operator mutation acceptance")
     snapshot = genome.snapshot()
     baseline_gene = genome.active_gene()
     baseline_scores = _evaluate_gene_on_tasks(baseline_gene, validation_tasks, state, encoder, memory, world_model)
     candidate_scores = _evaluate_gene_on_tasks(candidate, validation_tasks, state, encoder, memory, world_model)
+    hidden_baseline_scores = _evaluate_gene_on_tasks(baseline_gene, hidden_validation_tasks, state, encoder, memory, world_model)
+    hidden_candidate_scores = _evaluate_gene_on_tasks(candidate, hidden_validation_tasks, state, encoder, memory, world_model)
     deltas = [b - c for b, c in zip(baseline_scores, candidate_scores)]
+    hidden_deltas = [b - c for b, c in zip(hidden_baseline_scores, hidden_candidate_scores)]
     wins = sum(delta > improvement_threshold for delta in deltas)
     mean_improvement = float(mean(deltas))
     win_rate = float(wins / max(1, len(deltas)))
-    accepted = mean_improvement > improvement_threshold and wins >= max(1, math.ceil(len(validation_tasks) * 0.6))
+    hidden_mean_improvement = float(mean(hidden_deltas)) if hidden_deltas else 0.0
+    hidden_win_rate = float(sum(delta > -improvement_threshold for delta in hidden_deltas) / max(1, len(hidden_deltas)))
+    hidden_guard_regression = min(hidden_deltas) if hidden_deltas else 0.0
+    if improvement_threshold < -1e8:
+        accepted = True
+    else:
+        accepted = (
+            mean_improvement > improvement_threshold
+            and wins >= max(1, math.ceil(len(validation_tasks) * 0.6))
+            and hidden_mean_improvement >= -improvement_threshold
+            and hidden_win_rate >= 0.5
+            and hidden_guard_regression >= -0.25
+        )
     if accepted:
         genome.accept(candidate)
     else:
@@ -418,8 +520,13 @@ def _validate_operator_candidate(
         "baseline_operator": baseline_gene.to_dict(),
         "baseline_scores": [float(x) for x in baseline_scores],
         "candidate_scores": [float(x) for x in candidate_scores],
+        "hidden_baseline_scores": [float(x) for x in hidden_baseline_scores],
+        "hidden_candidate_scores": [float(x) for x in hidden_candidate_scores],
         "mean_improvement": mean_improvement,
         "win_rate": win_rate,
+        "hidden_mean_improvement": hidden_mean_improvement,
+        "hidden_win_rate": hidden_win_rate,
+        "hidden_guard_regression": hidden_guard_regression,
         "consistent_wins": wins,
         "accepted": accepted,
         "rollback": not accepted,
@@ -544,6 +651,7 @@ def _encoder_decoder_loss(decoder: TaskConditionedRegressor, encoder: LearnedTas
 def _evaluate_ablation_table(
     test_tasks: Sequence[SyntheticTask],
     val_tasks: Sequence[SyntheticTask],
+    hidden_val_tasks: Sequence[SyntheticTask],
     state: Dict[str, object],
     state_before_mutation: Dict[str, object],
     genome: OperatorGenome,
@@ -567,14 +675,26 @@ def _evaluate_ablation_table(
     memory_only, _, _, _ = _evaluate_tasks_operator(test_tasks, _state_for_no_controller(state), encoder, memory, memory_genome, selector_kind="fixed")
     world_losses, _, world_selected, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, genome, world_model=world_model, selector_kind="world")
     learned_losses, _, learned_selected, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind="learned", track_controller=True)
+    guarded_selector, selector_guard = _guarded_selector_kind(val_tasks, hidden_val_tasks, state, encoder, memory, genome, meta_controller, world_model)
+    no_rollback_selector, no_rollback_guard = _guarded_selector_kind(val_tasks, hidden_val_tasks, state, encoder, memory, no_rollback_genome, meta_controller, world_model)
+    no_mutation_selector, no_mutation_guard = _guarded_selector_kind(
+        val_tasks,
+        hidden_val_tasks,
+        state_before_mutation,
+        encoder,
+        memory,
+        genome_before_mutation,
+        meta_controller,
+        world_model,
+    )
     random_losses, _, _, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, genome, random_controller=random_controller, selector_kind="random")
-    no_rollback_losses, _, _, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, no_rollback_genome, meta_controller=meta_controller, selector_kind="learned")
-    rollback_losses, _, _, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind="learned")
+    no_rollback_losses, _, _, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, no_rollback_genome, meta_controller=meta_controller, selector_kind=no_rollback_selector)
+    rollback_losses, _, _, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind=guarded_selector)
     full_losses = rollback_losses
     wrong_losses, _, wrong_selected, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, genome, world_model=wrong_world_model, selector_kind="world")
-    shuffled_losses, _, _, _ = _evaluate_tasks_operator(test_tasks, state, encoder, _shuffled_memory(memory), genome, meta_controller=meta_controller, selector_kind="learned")
-    no_mutation_losses, _, _, _ = _evaluate_tasks_operator(test_tasks, state_before_mutation, encoder, memory, genome_before_mutation, meta_controller=meta_controller, selector_kind="learned")
-    val_full, _, _, _ = _evaluate_tasks_operator(val_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind="learned")
+    shuffled_losses, _, _, _ = _evaluate_tasks_operator(test_tasks, state, encoder, _shuffled_memory(memory), genome, meta_controller=meta_controller, selector_kind=guarded_selector)
+    no_mutation_losses, _, _, _ = _evaluate_tasks_operator(test_tasks, state_before_mutation, encoder, memory, genome_before_mutation, meta_controller=meta_controller, selector_kind=no_mutation_selector)
+    val_full, _, _, _ = _evaluate_tasks_operator(val_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind=guarded_selector)
 
     ablations = {
         "no_adaptation": float(mean(no_adaptation)),
@@ -597,6 +717,9 @@ def _evaluate_ablation_table(
         "world_selected": world_selected,
         "wrong_selected": wrong_selected,
         "learned_selected": learned_selected,
+        "guarded_selector": selector_guard,
+        "no_rollback_selector": no_rollback_guard,
+        "no_mutation_selector": no_mutation_guard,
         "world_wrong_selection_delta": float(sum(a != b for a, b in zip(world_selected, wrong_selected)) / max(1, len(world_selected))),
         "world_wrong_operator_selection_delta": float(sum(a != b for a, b in zip(world_selected, wrong_selected)) / max(1, len(world_selected))),
     }
@@ -616,9 +739,9 @@ def _evaluate_ablation_table(
 
 def _mode_config(mode: str) -> Dict[str, int]:
     return {
-        "smoke": {"generations": 2, "train": 6, "validation": 3, "test": 3, "encoder_steps": 8, "controller_steps": 18},
-        "quick": {"generations": 2, "train": 8, "validation": 4, "test": 4, "encoder_steps": 16, "controller_steps": 30},
-        "full": {"generations": 3, "train": 10, "validation": 5, "test": 5, "encoder_steps": 24, "controller_steps": 45},
+        "smoke": {"generations": 2, "train": 6, "validation": 3, "hidden_validation": 2, "test": 3, "encoder_steps": 8, "controller_steps": 18},
+        "quick": {"generations": 2, "train": 8, "validation": 4, "hidden_validation": 3, "test": 4, "encoder_steps": 16, "controller_steps": 30},
+        "full": {"generations": 3, "train": 10, "validation": 5, "hidden_validation": 4, "test": 5, "encoder_steps": 24, "controller_steps": 45},
     }[mode]
 
 
@@ -627,9 +750,11 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
     np.random.seed(seed)
     cfg = _mode_config(mode)
     suite = ProceduralTaskSuite(seed=seed)
+    hidden_suite = ProceduralTaskSuite(seed=seed + 10000)
     state = _initial_state(seed)
     all_train: List[SyntheticTask] = []
     all_val: List[SyntheticTask] = []
+    all_hidden_val: List[SyntheticTask] = []
     all_test: List[SyntheticTask] = []
     mutation_log: List[Dict[str, object]] = []
     generation_summaries: List[Dict[str, object]] = []
@@ -642,10 +767,12 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
     for generation in range(cfg["generations"]):
         train_tasks = suite.sample_mixed_tasks("train", cfg["train"], ood=False)
         val_tasks = suite.sample_mixed_tasks("validation", cfg["validation"], ood=False)
+        hidden_val_tasks = hidden_suite.sample_mixed_tasks("validation", cfg["hidden_validation"], ood=True)
         test_tasks = suite.sample_mixed_tasks("test", cfg["test"], ood=True)
-        assert_disjoint_task_ids(train_tasks, val_tasks, test_tasks)
+        assert_disjoint_task_ids(train_tasks, val_tasks, hidden_val_tasks, test_tasks)
         all_train.extend(train_tasks)
         all_val.extend(val_tasks)
+        all_hidden_val.extend(hidden_val_tasks)
         all_test.extend(test_tasks)
 
         encoder = LearnedTaskEncoder(latent_dim=8, hidden_dim=32, seed=seed + generation)
@@ -665,7 +792,18 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
         genome_before_mutation = copy.deepcopy(genome)
         no_rollback_genome = copy.deepcopy(genome_before_mutation)
         for candidate in genome.mutate_candidates(generation):
-            decision = _validate_operator_candidate(genome, candidate, val_tasks, state, encoder, memory, world_model, generation=generation, seed=seed)
+            decision = _validate_operator_candidate(
+                genome,
+                candidate,
+                val_tasks,
+                state,
+                encoder,
+                memory,
+                world_model,
+                generation=generation,
+                seed=seed,
+                hidden_validation_tasks=hidden_val_tasks,
+            )
             mutation_log.append(decision)
             if not decision["accepted"]:
                 no_rollback_genome.accept(candidate)
@@ -679,7 +817,17 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
         )
         random_controller = RandomController(post_gene_actions, seed=seed + 50 + generation)
 
-        val_losses, _, val_selected, _ = _evaluate_tasks_operator(val_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind="learned")
+        guarded_selector, selector_guard = _guarded_selector_kind(
+            val_tasks,
+            hidden_val_tasks,
+            state,
+            encoder,
+            memory,
+            genome,
+            meta_controller,
+            world_model,
+        )
+        val_losses, _, val_selected, _ = _evaluate_tasks_operator(val_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind=guarded_selector, world_model=world_model)
         train_default_losses, _, _, _ = _evaluate_tasks_operator(train_tasks, _state_for_no_controller(state), encoder, memory, genome, selector_kind="fixed")
         state["recent_losses"] = [
             float(mean(train_default_losses)),
@@ -688,7 +836,7 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
             float(sum(1 for m in mutation_log if m.get("rollback"))),
         ]
 
-        test_losses, _, test_selected, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind="learned")
+        test_losses, _, test_selected, _ = _evaluate_tasks_operator(test_tasks, state, encoder, memory, genome, meta_controller=meta_controller, selector_kind=guarded_selector, world_model=world_model)
         for selected in val_selected + test_selected:
             if selected in accepted_before_generation:
                 reuse_hits += 1
@@ -707,6 +855,7 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
                 "world_model_loss_final": wm_final,
                 "validation_loss": float(mean(val_losses)),
                 "frozen_ood_test_loss": float(mean(test_losses)),
+                "selector_guard": selector_guard,
                 "accepted_mutation_count": len([m for m in mutation_log if m.get("accepted")]),
                 "rollback_count": len([m for m in mutation_log if m.get("rollback")]),
                 "active_operator_gene": genome.active_gene_id,
@@ -717,6 +866,7 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
         last_context = {
             "train": train_tasks,
             "validation": val_tasks,
+            "hidden_validation": hidden_val_tasks,
             "test": test_tasks,
             "encoder": encoder,
             "decoder": decoder,
@@ -739,6 +889,7 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
     ablations, metrics, selector_stats = _evaluate_ablation_table(
         last_context["test"],
         last_context["validation"],
+        last_context["hidden_validation"],
         state,
         last_context["state_before_mutation"],
         last_context["genome"],
@@ -777,6 +928,9 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
             "ood_transfer_after_accepted_mutations": float(ablations["full_recursive_loop_no_mutation"] - ablations["full_recursive_loop"]),
             "accepted_mutation_quality": float(mean([float(m.get("mean_improvement", 0.0)) for m in accepted])) if accepted else 0.0,
             "accepted_operator_count": float(len(last_context["genome"].accepted_gene_ids)),
+            "selector_guard_fallback_count": float(
+                sum(1 for item in generation_summaries if item.get("selector_guard", {}).get("selected") != "learned")
+            ),
         }
     )
     return {
@@ -790,7 +944,7 @@ def _run_seed(seed: int, mode: str) -> Dict[str, object]:
         "operator_genome": last_context["genome"].to_dict(),
         "mutation_log": mutation_log,
         "generation_summaries": generation_summaries,
-        "tasks": {"train": all_train, "validation": all_val, "test": all_test},
+        "tasks": {"train": all_train, "validation": all_val, "hidden_validation": all_hidden_val, "test": all_test},
     }
 
 
@@ -816,6 +970,7 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
     aggregate = _aggregate(per)
     all_train = [task for item in per for task in item["tasks"]["train"]]
     all_val = [task for item in per for task in item["tasks"]["validation"]]
+    all_hidden_val = [task for item in per for task in item["tasks"]["hidden_validation"]]
     all_test = [task for item in per for task in item["tasks"]["test"]]
     mutation_log = [entry for item in per for entry in item["mutation_log"]]
     config = {
@@ -848,6 +1003,7 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
         "task_ids": {
             "train": [task.task_id for task in all_train],
             "validation": [task.task_id for task in all_val],
+            "hidden_validation": [task.task_id for task in all_hidden_val],
             "test": [task.task_id for task in all_test],
         },
         "mutation_log": mutation_log,
@@ -856,7 +1012,7 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
         "python benchmarks/recursive_self_improvement_benchmark.py",
         seeds,
         all_train,
-        all_val,
+        all_val + all_hidden_val,
         all_test,
         config,
         {"aggregate": aggregate, "per_seed": per_seed_payload},

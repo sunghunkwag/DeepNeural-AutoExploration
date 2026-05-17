@@ -28,6 +28,7 @@ from maml_functional import functional_forward
 
 GRADIENT_PRIMITIVES = (
     "maml_step",
+    "support_proxy_step",
     "reptile_interpolation",
     "variable_lr_step",
     "gradient_norm_clipping",
@@ -329,9 +330,9 @@ class _ProgramState:
         pred = functional_forward(self.context.model, self.adapted_params, sx[split:])
         return F.mse_loss(pred, sy[split:])
 
-    def _gradient_step(self, lr: float) -> None:
+    def _gradient_step(self, lr: float, *, proxy: bool = False) -> None:
         lr = _clamp(lr, 1e-5, 0.3)
-        loss = self._support_loss()
+        loss = self._support_proxy_loss() if proxy else self._support_loss()
         if not torch.isfinite(loss):
             raise FloatingPointError("operator program produced non-finite support loss")
         grads = torch.autograd.grad(loss, list(self.adapted_params.values()), create_graph=False, retain_graph=False, allow_unused=True)
@@ -356,6 +357,9 @@ class _ProgramState:
 
     def _op_maml_step(self, step: PrimitiveStep) -> None:
         self._gradient_step(self.current_lr)
+
+    def _op_support_proxy_step(self, step: PrimitiveStep) -> None:
+        self._gradient_step(self.current_lr, proxy=True)
 
     def _op_variable_lr_step(self, step: PrimitiveStep) -> None:
         decay = float(step.args.get("decay", self.program.parameters.get("decay", 0.75)))
@@ -529,7 +533,7 @@ def execute_operator_program(program: OperatorProgram, context: OperatorExecutio
 def program_action_vector(program: OperatorProgram) -> torch.Tensor:
     names = {step.name for step in program.primitive_sequence}
     lr_scale = float(program.parameters.get("lr_scale", 1.0))
-    step_count = sum(1 for step in program.primitive_sequence if step.name in {"maml_step", "variable_lr_step"})
+    step_count = sum(1 for step in program.primitive_sequence if step.name in {"maml_step", "support_proxy_step", "variable_lr_step"})
     memory_flag = 1.0 if names & set(MEMORY_PRIMITIVES) else 0.0
     world_flag = 1.0 if names & set(WORLD_MODEL_PRIMITIVES) else 0.0
     objective_flag = 1.0 if names & set(OBJECTIVE_PRIMITIVES) else 0.0

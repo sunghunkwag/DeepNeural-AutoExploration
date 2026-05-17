@@ -135,6 +135,27 @@ class CandidateGenerator:
         out.append(
             (
                 self._program(
+                    f"g{generation}_support_proxy_clip",
+                    (
+                        PrimitiveStep("gradient_norm_clipping", {"max_norm": 1.25}),
+                        PrimitiveStep("support_loss_weighting", {"weight": 0.7}),
+                        PrimitiveStep("constant_lr"),
+                        PrimitiveStep("support_proxy_step"),
+                        PrimitiveStep("decayed_lr", {"decay": 0.65}),
+                        PrimitiveStep("maml_step"),
+                    ),
+                    self._perturbed_params(best, lr_scale=0.65, decay=0.65, clip_norm=1.25, support_weight=0.7),
+                    best,
+                    generation,
+                ),
+                "support_proxy_mutation",
+                "optimize through a support holdout step plus a conservative clipped MAML step for OOD robustness",
+                [best.program_id],
+            )
+        )
+        out.append(
+            (
+                self._program(
                     f"g{generation}_maml_clip_decay",
                     (
                         PrimitiveStep("gradient_norm_clipping", {"max_norm": 2.0}),
