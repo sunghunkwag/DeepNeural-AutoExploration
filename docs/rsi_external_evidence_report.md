@@ -4,6 +4,8 @@ Date: 2026-05-18
 
 This report records the current external benchmark evidence for the repository's bounded recursive self-improvement work. It is written to separate supported claims from unsupported claims.
 
+Generated benchmark JSON and manifest files are not tracked in Git. The command blocks below reproduce the local `results/` artifacts; durable evidence is summarized in this document.
+
 ## Supported Claim
 
 The repository demonstrates bounded, validation-gated, executable-program RSI improvement on:
