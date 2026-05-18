@@ -944,6 +944,14 @@ class _ProgramState:
                     lambda grid, dc=dc, mode=mode: self._rowwise_terminal_shift(grid, dc, mode),
                 )
 
+        for block_color in marker_colors:
+            add_candidate(
+                f"project_markers_to_block:{block_color}",
+                lambda grid, block_color=block_color: self._project_markers_to_block(grid, block_color),
+            )
+
+        add_candidate("move_objects_up_by_height", self._move_objects_up_by_height)
+
         return candidates
 
     @staticmethod
@@ -1185,6 +1193,84 @@ class _ProgramState:
                 current += 1
                 longest = max(longest, current)
         return longest
+
+    def _project_markers_to_block(self, grid: Sequence[Sequence[int]], block_color: int) -> List[List[int]]:
+        rows, cols = self._grid_shape(grid)
+        if rows == 0 or cols == 0:
+            return []
+        background = self._background_color(grid)
+        cells = [
+            (row_index, col_index)
+            for row_index, row in enumerate(grid)
+            for col_index, color in enumerate(row)
+            if int(color) == int(block_color)
+        ]
+        if len(cells) < 4:
+            return [list(map(int, row)) for row in grid]
+        min_row = min(row for row, _ in cells)
+        max_row = max(row for row, _ in cells)
+        min_col = min(col for _, col in cells)
+        max_col = max(col for _, col in cells)
+        if min_row == max_row or min_col == max_col:
+            return [list(map(int, row)) for row in grid]
+        out = [list(map(int, row)) for row in grid]
+        for row_index, row in enumerate(grid):
+            for col_index, color in enumerate(row):
+                value = int(color)
+                if value in {int(background), int(block_color)}:
+                    continue
+                inside_block_box = min_row <= row_index <= max_row and min_col <= col_index <= max_col
+                if inside_block_box:
+                    continue
+                if min_row <= row_index <= max_row:
+                    target_col = min_col if col_index < min_col else max_col if col_index > max_col else None
+                    if target_col is not None:
+                        out[row_index][target_col] = value
+                if min_col <= col_index <= max_col:
+                    target_row = min_row if row_index < min_row else max_row if row_index > max_row else None
+                    if target_row is not None:
+                        out[target_row][col_index] = value
+        return out
+
+    def _move_objects_up_by_height(self, grid: Sequence[Sequence[int]]) -> List[List[int]]:
+        rows, cols = self._grid_shape(grid)
+        if rows == 0 or cols == 0:
+            return []
+        background = self._background_color(grid)
+        visited = [[False for _ in range(cols)] for _ in range(rows)]
+        components: List[Tuple[int, List[Tuple[int, int]]]] = []
+        for start_row in range(rows):
+            for start_col in range(cols):
+                color = int(grid[start_row][start_col])
+                if color == int(background) or visited[start_row][start_col]:
+                    continue
+                stack = [(start_row, start_col)]
+                visited[start_row][start_col] = True
+                cells: List[Tuple[int, int]] = []
+                while stack:
+                    row_index, col_index = stack.pop()
+                    cells.append((row_index, col_index))
+                    for nr, nc in (
+                        (row_index - 1, col_index),
+                        (row_index + 1, col_index),
+                        (row_index, col_index - 1),
+                        (row_index, col_index + 1),
+                    ):
+                        if 0 <= nr < rows and 0 <= nc < cols and not visited[nr][nc] and int(grid[nr][nc]) == color:
+                            visited[nr][nc] = True
+                            stack.append((nr, nc))
+                components.append((color, cells))
+
+        out = [[int(background) for _ in range(cols)] for _ in range(rows)]
+        for color, cells in sorted(components, key=lambda item: (min(row for row, _ in item[1]), min(col for _, col in item[1]))):
+            min_row = min(row for row, _ in cells)
+            max_row = max(row for row, _ in cells)
+            height = max_row - min_row + 1
+            for row_index, col_index in cells:
+                target_row = row_index - height
+                if 0 <= target_row < rows:
+                    out[target_row][col_index] = int(color)
+        return out
 
     @staticmethod
     def _grid_shape(grid: Sequence[Sequence[int]]) -> Tuple[int, int]:

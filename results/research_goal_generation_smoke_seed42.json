@@ -1,0 +1,1027 @@
+{
+  "benchmark": "research_goal_generation_controller",
+  "config": {
+    "benchmark": "research_goal_generation_controller",
+    "evidence_paths": [
+      "results\\arc_external_rsi_exact_repair_guarded_quick_seed42.json",
+      "results\\arc_external_rsi_exact_repair_guarded_full_seed42.json"
+    ],
+    "meta_config": {
+      "candidates_per_round": 6,
+      "mutation_scale": 0.12,
+      "rounds": 2,
+      "seed": 42
+    },
+    "mode": "smoke",
+    "policy_config": {
+      "cell_target": 0.98,
+      "coding_generalization_target": 1.0,
+      "creative_weight": 0.12,
+      "exact_target": 0.9,
+      "frontier_weight": 0.27999999999999997,
+      "gap_weight": 0.32,
+      "max_goals": 12,
+      "min_cell_gap": 0.02,
+      "min_exact_gap": 0.05,
+      "transfer_gain_floor": 0.05,
+      "transfer_threshold": 0.45,
+      "transfer_weight": 0.27999999999999997
+    },
+    "seed": 42
+  },
+  "evidence": [
+    {
+      "benchmark": "external_arc_agi_same_shape_code_level_rsi",
+      "evidence_id": "evidence_93331781645f336b",
+      "limitations": [
+        "same_shape_arc_only",
+        "not_official_arc_leaderboard"
+      ],
+      "mechanism_tags": [
+        "1",
+        "agi",
+        "arc",
+        "cell",
+        "cell_accuracy",
+        "code",
+        "exact",
+        "exact_grid",
+        "exact_repair",
+        "external",
+        "guarded",
+        "json",
+        "level",
+        "loss_improvement",
+        "prediction",
+        "public",
+        "quick",
+        "repair",
+        "results",
+        "rsi",
+        "same",
+        "seed42",
+        "shape",
+        "subset",
+        "training"
+      ],
+      "metrics": {
+        "accepted_program_count": 15.0,
+        "baseline_cell_accuracy": 0.6445714285714286,
+        "baseline_exact_task_accuracy": 0.0,
+        "baseline_mean_loss": 1.6664597272872925,
+        "baseline_to_evolved_loss_delta": 1.1773635250108783,
+        "candidate_count": 16.0,
+        "cell_accuracy_delta": 0.31314285714285717,
+        "evolved_cell_accuracy": 0.9577142857142857,
+        "evolved_exact_task_accuracy": 0.4,
+        "evolved_mean_loss": 0.48909620227641426,
+        "exact_task_accuracy_delta": 0.4,
+        "external_filtered_task_count": 169.0,
+        "external_test_task_count": 5.0,
+        "runtime_behavior_difference_observed": 1.0,
+        "seed": 42.0,
+        "selector_guard_fallback_count": 2.0,
+        "validation_rejected_count": 1.0
+      },
+      "mode": "quick",
+      "scope": "ARC-AGI-1 public training same-shape cell-prediction subset",
+      "seed": 42,
+      "source_path": "results\\arc_external_rsi_exact_repair_guarded_quick_seed42.json"
+    },
+    {
+      "benchmark": "external_arc_agi_same_shape_code_level_rsi",
+      "evidence_id": "evidence_aba17c6274fa8326",
+      "limitations": [
+        "same_shape_arc_only",
+        "not_official_arc_leaderboard"
+      ],
+      "mechanism_tags": [
+        "1",
+        "agi",
+        "arc",
+        "cell",
+        "cell_accuracy",
+        "code",
+        "exact",
+        "exact_grid",
+        "exact_repair",
+        "external",
+        "full",
+        "guarded",
+        "json",
+        "level",
+        "loss_improvement",
+        "prediction",
+        "public",
+        "repair",
+        "results",
+        "rsi",
+        "same",
+        "seed42",
+        "shape",
+        "subset",
+        "training"
+      ],
+      "metrics": {
+        "accepted_program_count": 23.0,
+        "baseline_cell_accuracy": 0.6680555555555556,
+        "baseline_exact_task_accuracy": 0.0,
+        "baseline_mean_loss": 1.7201447784900665,
+        "baseline_to_evolved_loss_delta": 0.9274991016823151,
+        "candidate_count": 27.0,
+        "cell_accuracy_delta": 0.2563888888888888,
+        "evolved_cell_accuracy": 0.9244444444444444,
+        "evolved_exact_task_accuracy": 0.625,
+        "evolved_mean_loss": 0.7926456768077514,
+        "exact_task_accuracy_delta": 0.625,
+        "external_filtered_task_count": 185.0,
+        "external_test_task_count": 8.0,
+        "runtime_behavior_difference_observed": 1.0,
+        "seed": 42.0,
+        "selector_guard_fallback_count": 3.0,
+        "validation_rejected_count": 4.0
+      },
+      "mode": "full",
+      "scope": "ARC-AGI-1 public training same-shape cell-prediction subset",
+      "seed": 42,
+      "source_path": "results\\arc_external_rsi_exact_repair_guarded_full_seed42.json"
+    }
+  ],
+  "evidence_count": 2,
+  "generated_goals": [
+    {
+      "current_value": 0.4,
+      "domain": "arc_agi1_exact_grid",
+      "expected_transfer_tags": [
+        "arc",
+        "exact_grid",
+        "exact_repair"
+      ],
+      "feasible": true,
+      "goal_id": "goal_9d2fcaa3b7d1e048",
+      "parent_goal_id": null,
+      "priority": 0.8252649155357565,
+      "proposed_actions": [
+        "Cluster unresolved ARC held-out tasks by failed transform family.",
+        "Add support-only exact-grid candidate primitives for the largest unresolved clusters.",
+        "Require leave-one-support-out exact-grid validation before final deployment."
+      ],
+      "rationale": "The current run has positive bounded RSI evidence but still leaves exact-grid accuracy below the configured target.",
+      "source_evidence_ids": [
+        "evidence_93331781645f336b"
+      ],
+      "strategy": "gap",
+      "target_metric": "evolved_exact_task_accuracy",
+      "target_value": 1.0,
+      "title": "Raise ARC exact-grid accuracy for quick seed 42"
+    },
+    {
+      "current_value": 0.625,
+      "domain": "arc_agi1_exact_grid",
+      "expected_transfer_tags": [
+        "arc",
+        "exact_grid",
+        "exact_repair"
+      ],
+      "feasible": true,
+      "goal_id": "goal_3f9165abc0939872",
+      "parent_goal_id": null,
+      "priority": 0.7352649155357565,
+      "proposed_actions": [
+        "Cluster unresolved ARC held-out tasks by failed transform family.",
+        "Add support-only exact-grid candidate primitives for the largest unresolved clusters.",
+        "Require leave-one-support-out exact-grid validation before final deployment."
+      ],
+      "rationale": "The current run has positive bounded RSI evidence but still leaves exact-grid accuracy below the configured target.",
+      "source_evidence_ids": [
+        "evidence_aba17c6274fa8326"
+      ],
+      "strategy": "gap",
+      "target_metric": "evolved_exact_task_accuracy",
+      "target_value": 1.0,
+      "title": "Raise ARC exact-grid accuracy for full seed 42"
+    },
+    {
+      "current_value": 0.0,
+      "domain": "arc_agi1_same_shape_unseen_seeds",
+      "expected_transfer_tags": [
+        "arc",
+        "cell_accuracy",
+        "exact_grid",
+        "exact_repair"
+      ],
+      "feasible": true,
+      "goal_id": "goal_e139c5407775ef5b",
+      "parent_goal_id": null,
+      "priority": 0.4689037896229442,
+      "proposed_actions": [
+        "Create a validation-only target split for the transfer domain.",
+        "Reuse the source mechanism only as a candidate generator, not as a final scorer.",
+        "Accept transfer only if held-out target metrics improve after selection is frozen."
+      ],
+      "rationale": "Positive ARC deltas should be checked across seeds before being treated as stable.",
+      "source_evidence_ids": [
+        "evidence_aba17c6274fa8326"
+      ],
+      "strategy": "transfer",
+      "target_metric": "transfer_validated_delta",
+      "target_value": 0.675,
+      "title": "Transfer arc, cell_accuracy, exact_grid to arc_agi1_same_shape_unseen_seeds"
+    },
+    {
+      "current_value": 0.4,
+      "domain": "arc_agi1_cell_to_exact_alignment",
+      "expected_transfer_tags": [
+        "arc",
+        "exact_grid"
+      ],
+      "feasible": true,
+      "goal_id": "goal_0e420e5b0e3cf329",
+      "parent_goal_id": null,
+      "priority": 0.44315343765808957,
+      "proposed_actions": [
+        "Penalize single-cell residual errors on support cross-validation when exact-grid candidates are available.",
+        "Add residual repair primitives that target boundary, row, column, and connected-component leftovers.",
+        "Report exact-grid success separately from mean cell accuracy."
+      ],
+      "rationale": "High cell accuracy with lower exact-grid accuracy indicates residual structural errors rather than complete failure.",
+      "source_evidence_ids": [
+        "evidence_93331781645f336b"
+      ],
+      "strategy": "frontier",
+      "target_metric": "exact_alignment_from_cell_gains",
+      "target_value": 0.65,
+      "title": "Convert ARC cell gains into exact grids for quick seed 42"
+    },
+    {
+      "current_value": 0.8518518518518519,
+      "domain": "operator_program_search",
+      "expected_transfer_tags": [
+        "operator_program",
+        "failure_grammar"
+      ],
+      "feasible": true,
+      "goal_id": "goal_00ab43fde18d37eb",
+      "parent_goal_id": null,
+      "priority": 0.41783358902317763,
+      "proposed_actions": [
+        "Use rejected candidate failure residues to bias the next candidate generator batch.",
+        "Increase diversity only in primitives that previously changed runtime behavior.",
+        "Keep validation and hidden-validation acceptance separate from final test scoring."
+      ],
+      "rationale": "Rejected validation candidates provide direct information for improving the candidate generator.",
+      "source_evidence_ids": [
+        "evidence_aba17c6274fa8326"
+      ],
+      "strategy": "gap",
+      "target_metric": "accepted_program_rate",
+      "target_value": 0.9518518518518518,
+      "title": "Improve candidate precision for full seed 42"
+    },
+    {
+      "current_value": 0.0,
+      "domain": "external_arc_agi_same_shape_code_level_rsi:quick:seed42",
+      "expected_transfer_tags": [
+        "1",
+        "agi",
+        "arc",
+        "cell",
+        "cell_accuracy",
+        "code",
+        "exact",
+        "exact_grid",
+        "exact_repair",
+        "external",
+        "guarded",
+        "json",
+        "level",
+        "loss_improvement",
+        "prediction",
+        "public",
+        "repair",
+        "results",
+        "rsi",
+        "same",
+        "seed42",
+        "shape",
+        "subset",
+        "training"
+      ],
+      "feasible": true,
+      "goal_id": "goal_b0a801f5f7c35b86",
+      "parent_goal_id": null,
+      "priority": 0.39179248146954315,
+      "proposed_actions": [
+        "Create a validation-only target split for the transfer domain.",
+        "Reuse the source mechanism only as a candidate generator, not as a final scorer.",
+        "Accept transfer only if held-out target metrics improve after selection is frozen."
+      ],
+      "rationale": "A stronger source run and a weaker target run share mechanism tags, so transfer should be tested explicitly.",
+      "source_evidence_ids": [
+        "evidence_aba17c6274fa8326"
+      ],
+      "strategy": "transfer",
+      "target_metric": "transfer_validated_delta",
+      "target_value": 0.27499999999999997,
+      "title": "Transfer 1, agi, arc to external_arc_agi_same_shape_code_level_rsi:quick:seed42"
+    },
+    {
+      "current_value": 0.0,
+      "domain": "arc_agi1_same_shape_unseen_seeds",
+      "expected_transfer_tags": [
+        "arc",
+        "cell_accuracy",
+        "exact_grid",
+        "exact_repair"
+      ],
+      "feasible": true,
+      "goal_id": "goal_410e5bc8b12dd4be",
+      "parent_goal_id": null,
+      "priority": 0.35640378962294417,
+      "proposed_actions": [
+        "Create a validation-only target split for the transfer domain.",
+        "Reuse the source mechanism only as a candidate generator, not as a final scorer.",
+        "Accept transfer only if held-out target metrics improve after selection is frozen."
+      ],
+      "rationale": "Positive ARC deltas should be checked across seeds before being treated as stable.",
+      "source_evidence_ids": [
+        "evidence_93331781645f336b"
+      ],
+      "strategy": "transfer",
+      "target_metric": "transfer_validated_delta",
+      "target_value": 0.45,
+      "title": "Transfer arc, cell_accuracy, exact_grid to arc_agi1_same_shape_unseen_seeds"
+    },
+    {
+      "current_value": 0.625,
+      "domain": "arc_agi1_cell_to_exact_alignment",
+      "expected_transfer_tags": [
+        "arc",
+        "exact_grid"
+      ],
+      "feasible": true,
+      "goal_id": "goal_41fce81a856d3a4c",
+      "parent_goal_id": null,
+      "priority": 0.3527589932136451,
+      "proposed_actions": [
+        "Penalize single-cell residual errors on support cross-validation when exact-grid candidates are available.",
+        "Add residual repair primitives that target boundary, row, column, and connected-component leftovers.",
+        "Report exact-grid success separately from mean cell accuracy."
+      ],
+      "rationale": "High cell accuracy with lower exact-grid accuracy indicates residual structural errors rather than complete failure.",
+      "source_evidence_ids": [
+        "evidence_aba17c6274fa8326"
+      ],
+      "strategy": "frontier",
+      "target_metric": "exact_alignment_from_cell_gains",
+      "target_value": 0.875,
+      "title": "Convert ARC cell gains into exact grids for full seed 42"
+    },
+    {
+      "current_value": 0.9244444444444444,
+      "domain": "arc_agi1_cell_accuracy",
+      "expected_transfer_tags": [
+        "arc",
+        "cell_accuracy"
+      ],
+      "feasible": true,
+      "goal_id": "goal_8d5ef0cc839345f1",
+      "parent_goal_id": null,
+      "priority": 0.34982843765808963,
+      "proposed_actions": [
+        "Expand candidate search around support-validated symbolic programs.",
+        "Track cell gains and exact-grid regressions as separate acceptance terms.",
+        "Retain deployment penalties for low-confidence symbolic programs."
+      ],
+      "rationale": "Cell accuracy remains below target, so there is still a measurable bounded optimization frontier.",
+      "source_evidence_ids": [
+        "evidence_aba17c6274fa8326"
+      ],
+      "strategy": "frontier",
+      "target_metric": "evolved_cell_accuracy",
+      "target_value": 1.0,
+      "title": "Improve ARC cell accuracy for full seed 42"
+    },
+    {
+      "current_value": 0.9577142857142857,
+      "domain": "arc_agi1_cell_accuracy",
+      "expected_transfer_tags": [
+        "arc",
+        "cell_accuracy"
+      ],
+      "feasible": true,
+      "goal_id": "goal_edd2a3214f5c2c70",
+      "parent_goal_id": null,
+      "priority": 0.34738200908666106,
+      "proposed_actions": [
+        "Expand candidate search around support-validated symbolic programs.",
+        "Track cell gains and exact-grid regressions as separate acceptance terms.",
+        "Retain deployment penalties for low-confidence symbolic programs."
+      ],
+      "rationale": "Cell accuracy remains below target, so there is still a measurable bounded optimization frontier.",
+      "source_evidence_ids": [
+        "evidence_93331781645f336b"
+      ],
+      "strategy": "frontier",
+      "target_metric": "evolved_cell_accuracy",
+      "target_value": 1.0,
+      "title": "Improve ARC cell accuracy for quick seed 42"
+    },
+    {
+      "current_value": 0.0,
+      "domain": "arc_agi1_variable_shape_adapter",
+      "expected_transfer_tags": [
+        "arc",
+        "exact_grid"
+      ],
+      "feasible": true,
+      "goal_id": "goal_ef75ed2a453da2b7",
+      "parent_goal_id": null,
+      "priority": 0.33553032454852416,
+      "proposed_actions": [
+        "Create a validation-only target split for the transfer domain.",
+        "Reuse the source mechanism only as a candidate generator, not as a final scorer.",
+        "Accept transfer only if held-out target metrics improve after selection is frozen."
+      ],
+      "rationale": "Same-shape repair mechanisms are plausible candidate generators for variable-shape adapters, but need a separate validation split.",
+      "source_evidence_ids": [
+        "evidence_aba17c6274fa8326"
+      ],
+      "strategy": "transfer",
+      "target_metric": "transfer_validated_delta",
+      "target_value": 0.45625,
+      "title": "Transfer arc, exact_grid to arc_agi1_variable_shape_adapter"
+    },
+    {
+      "current_value": 0.9375,
+      "domain": "operator_program_search",
+      "expected_transfer_tags": [
+        "operator_program",
+        "failure_grammar"
+      ],
+      "feasible": true,
+      "goal_id": "goal_c1c9776532db9185",
+      "parent_goal_id": null,
+      "priority": 0.3321854408750295,
+      "proposed_actions": [
+        "Use rejected candidate failure residues to bias the next candidate generator batch.",
+        "Increase diversity only in primitives that previously changed runtime behavior.",
+        "Keep validation and hidden-validation acceptance separate from final test scoring."
+      ],
+      "rationale": "Rejected validation candidates provide direct information for improving the candidate generator.",
+      "source_evidence_ids": [
+        "evidence_93331781645f336b"
+      ],
+      "strategy": "gap",
+      "target_metric": "accepted_program_rate",
+      "target_value": 1.0,
+      "title": "Improve candidate precision for quick seed 42"
+    }
+  ],
+  "manifest_path": "results\\research_goal_generation_smoke_seed42.manifest.json",
+  "meta_meta": {
+    "accepted_updates": [
+      {
+        "accepted": true,
+        "config": {
+          "cell_target": 0.9877142857142858,
+          "coding_generalization_target": 1.0,
+          "creative_weight": 0.10714285714285715,
+          "exact_target": 0.9,
+          "frontier_weight": 0.25,
+          "gap_weight": 0.375,
+          "max_goals": 12,
+          "min_cell_gap": 0.02,
+          "min_exact_gap": 0.05,
+          "transfer_gain_floor": 0.05,
+          "transfer_threshold": 0.45,
+          "transfer_weight": 0.26785714285714285
+        },
+        "new_score": 0.827119751984127,
+        "previous_score": 0.8254991964285715,
+        "round": 0
+      },
+      {
+        "accepted": true,
+        "config": {
+          "cell_target": 1.0,
+          "coding_generalization_target": 1.0,
+          "creative_weight": 0.15657960590574652,
+          "exact_target": 0.9086947419491282,
+          "frontier_weight": 0.29374108884250816,
+          "gap_weight": 0.278783678429551,
+          "max_goals": 12,
+          "min_cell_gap": 0.02,
+          "min_exact_gap": 0.05,
+          "transfer_gain_floor": 0.05,
+          "transfer_threshold": 0.42084825053000485,
+          "transfer_weight": 0.2708956268221943
+        },
+        "new_score": 0.8309233229808041,
+        "previous_score": 0.827119751984127,
+        "round": 0
+      },
+      {
+        "accepted": true,
+        "config": {
+          "cell_target": 1.0,
+          "coding_generalization_target": 1.0,
+          "creative_weight": 0.10713570568865201,
+          "exact_target": 1.0,
+          "frontier_weight": 0.3222913890420034,
+          "gap_weight": 0.30542609060906317,
+          "max_goals": 12,
+          "min_cell_gap": 0.02,
+          "min_exact_gap": 0.05,
+          "transfer_gain_floor": 0.05,
+          "transfer_threshold": 0.447039691890082,
+          "transfer_weight": 0.26514681466028134
+        },
+        "new_score": 0.8337898464747583,
+        "previous_score": 0.8309233229808041,
+        "round": 1
+      },
+      {
+        "accepted": true,
+        "config": {
+          "cell_target": 1.0,
+          "coding_generalization_target": 1.0,
+          "creative_weight": 0.08748916533661069,
+          "exact_target": 1.0,
+          "frontier_weight": 0.2479534376580896,
+          "gap_weight": 0.3852649155357565,
+          "max_goals": 12,
+          "min_cell_gap": 0.02,
+          "min_exact_gap": 0.05,
+          "transfer_gain_floor": 0.05,
+          "transfer_threshold": 0.43451618903591993,
+          "transfer_weight": 0.27929248146954316
+        },
+        "new_score": 0.8341946629777145,
+        "previous_score": 0.8337898464747583,
+        "round": 1
+      }
+    ],
+    "final_config": {
+      "cell_target": 1.0,
+      "coding_generalization_target": 1.0,
+      "creative_weight": 0.08748916533661069,
+      "exact_target": 1.0,
+      "frontier_weight": 0.2479534376580896,
+      "gap_weight": 0.3852649155357565,
+      "max_goals": 12,
+      "min_cell_gap": 0.02,
+      "min_exact_gap": 0.05,
+      "transfer_gain_floor": 0.05,
+      "transfer_threshold": 0.43451618903591993,
+      "transfer_weight": 0.27929248146954316
+    },
+    "final_score": 0.8341946629777145,
+    "goals": [
+      {
+        "current_value": 0.4,
+        "domain": "arc_agi1_exact_grid",
+        "expected_transfer_tags": [
+          "arc",
+          "exact_grid",
+          "exact_repair"
+        ],
+        "feasible": true,
+        "goal_id": "goal_9d2fcaa3b7d1e048",
+        "parent_goal_id": null,
+        "priority": 0.8252649155357565,
+        "proposed_actions": [
+          "Cluster unresolved ARC held-out tasks by failed transform family.",
+          "Add support-only exact-grid candidate primitives for the largest unresolved clusters.",
+          "Require leave-one-support-out exact-grid validation before final deployment."
+        ],
+        "rationale": "The current run has positive bounded RSI evidence but still leaves exact-grid accuracy below the configured target.",
+        "source_evidence_ids": [
+          "evidence_93331781645f336b"
+        ],
+        "strategy": "gap",
+        "target_metric": "evolved_exact_task_accuracy",
+        "target_value": 1.0,
+        "title": "Raise ARC exact-grid accuracy for quick seed 42"
+      },
+      {
+        "current_value": 0.625,
+        "domain": "arc_agi1_exact_grid",
+        "expected_transfer_tags": [
+          "arc",
+          "exact_grid",
+          "exact_repair"
+        ],
+        "feasible": true,
+        "goal_id": "goal_3f9165abc0939872",
+        "parent_goal_id": null,
+        "priority": 0.7352649155357565,
+        "proposed_actions": [
+          "Cluster unresolved ARC held-out tasks by failed transform family.",
+          "Add support-only exact-grid candidate primitives for the largest unresolved clusters.",
+          "Require leave-one-support-out exact-grid validation before final deployment."
+        ],
+        "rationale": "The current run has positive bounded RSI evidence but still leaves exact-grid accuracy below the configured target.",
+        "source_evidence_ids": [
+          "evidence_aba17c6274fa8326"
+        ],
+        "strategy": "gap",
+        "target_metric": "evolved_exact_task_accuracy",
+        "target_value": 1.0,
+        "title": "Raise ARC exact-grid accuracy for full seed 42"
+      },
+      {
+        "current_value": 0.0,
+        "domain": "arc_agi1_same_shape_unseen_seeds",
+        "expected_transfer_tags": [
+          "arc",
+          "cell_accuracy",
+          "exact_grid",
+          "exact_repair"
+        ],
+        "feasible": true,
+        "goal_id": "goal_e139c5407775ef5b",
+        "parent_goal_id": null,
+        "priority": 0.4689037896229442,
+        "proposed_actions": [
+          "Create a validation-only target split for the transfer domain.",
+          "Reuse the source mechanism only as a candidate generator, not as a final scorer.",
+          "Accept transfer only if held-out target metrics improve after selection is frozen."
+        ],
+        "rationale": "Positive ARC deltas should be checked across seeds before being treated as stable.",
+        "source_evidence_ids": [
+          "evidence_aba17c6274fa8326"
+        ],
+        "strategy": "transfer",
+        "target_metric": "transfer_validated_delta",
+        "target_value": 0.675,
+        "title": "Transfer arc, cell_accuracy, exact_grid to arc_agi1_same_shape_unseen_seeds"
+      },
+      {
+        "current_value": 0.4,
+        "domain": "arc_agi1_cell_to_exact_alignment",
+        "expected_transfer_tags": [
+          "arc",
+          "exact_grid"
+        ],
+        "feasible": true,
+        "goal_id": "goal_0e420e5b0e3cf329",
+        "parent_goal_id": null,
+        "priority": 0.44315343765808957,
+        "proposed_actions": [
+          "Penalize single-cell residual errors on support cross-validation when exact-grid candidates are available.",
+          "Add residual repair primitives that target boundary, row, column, and connected-component leftovers.",
+          "Report exact-grid success separately from mean cell accuracy."
+        ],
+        "rationale": "High cell accuracy with lower exact-grid accuracy indicates residual structural errors rather than complete failure.",
+        "source_evidence_ids": [
+          "evidence_93331781645f336b"
+        ],
+        "strategy": "frontier",
+        "target_metric": "exact_alignment_from_cell_gains",
+        "target_value": 0.65,
+        "title": "Convert ARC cell gains into exact grids for quick seed 42"
+      },
+      {
+        "current_value": 0.8518518518518519,
+        "domain": "operator_program_search",
+        "expected_transfer_tags": [
+          "operator_program",
+          "failure_grammar"
+        ],
+        "feasible": true,
+        "goal_id": "goal_00ab43fde18d37eb",
+        "parent_goal_id": null,
+        "priority": 0.41783358902317763,
+        "proposed_actions": [
+          "Use rejected candidate failure residues to bias the next candidate generator batch.",
+          "Increase diversity only in primitives that previously changed runtime behavior.",
+          "Keep validation and hidden-validation acceptance separate from final test scoring."
+        ],
+        "rationale": "Rejected validation candidates provide direct information for improving the candidate generator.",
+        "source_evidence_ids": [
+          "evidence_aba17c6274fa8326"
+        ],
+        "strategy": "gap",
+        "target_metric": "accepted_program_rate",
+        "target_value": 0.9518518518518518,
+        "title": "Improve candidate precision for full seed 42"
+      },
+      {
+        "current_value": 0.0,
+        "domain": "external_arc_agi_same_shape_code_level_rsi:quick:seed42",
+        "expected_transfer_tags": [
+          "1",
+          "agi",
+          "arc",
+          "cell",
+          "cell_accuracy",
+          "code",
+          "exact",
+          "exact_grid",
+          "exact_repair",
+          "external",
+          "guarded",
+          "json",
+          "level",
+          "loss_improvement",
+          "prediction",
+          "public",
+          "repair",
+          "results",
+          "rsi",
+          "same",
+          "seed42",
+          "shape",
+          "subset",
+          "training"
+        ],
+        "feasible": true,
+        "goal_id": "goal_b0a801f5f7c35b86",
+        "parent_goal_id": null,
+        "priority": 0.39179248146954315,
+        "proposed_actions": [
+          "Create a validation-only target split for the transfer domain.",
+          "Reuse the source mechanism only as a candidate generator, not as a final scorer.",
+          "Accept transfer only if held-out target metrics improve after selection is frozen."
+        ],
+        "rationale": "A stronger source run and a weaker target run share mechanism tags, so transfer should be tested explicitly.",
+        "source_evidence_ids": [
+          "evidence_aba17c6274fa8326"
+        ],
+        "strategy": "transfer",
+        "target_metric": "transfer_validated_delta",
+        "target_value": 0.27499999999999997,
+        "title": "Transfer 1, agi, arc to external_arc_agi_same_shape_code_level_rsi:quick:seed42"
+      },
+      {
+        "current_value": 0.0,
+        "domain": "arc_agi1_same_shape_unseen_seeds",
+        "expected_transfer_tags": [
+          "arc",
+          "cell_accuracy",
+          "exact_grid",
+          "exact_repair"
+        ],
+        "feasible": true,
+        "goal_id": "goal_410e5bc8b12dd4be",
+        "parent_goal_id": null,
+        "priority": 0.35640378962294417,
+        "proposed_actions": [
+          "Create a validation-only target split for the transfer domain.",
+          "Reuse the source mechanism only as a candidate generator, not as a final scorer.",
+          "Accept transfer only if held-out target metrics improve after selection is frozen."
+        ],
+        "rationale": "Positive ARC deltas should be checked across seeds before being treated as stable.",
+        "source_evidence_ids": [
+          "evidence_93331781645f336b"
+        ],
+        "strategy": "transfer",
+        "target_metric": "transfer_validated_delta",
+        "target_value": 0.45,
+        "title": "Transfer arc, cell_accuracy, exact_grid to arc_agi1_same_shape_unseen_seeds"
+      },
+      {
+        "current_value": 0.625,
+        "domain": "arc_agi1_cell_to_exact_alignment",
+        "expected_transfer_tags": [
+          "arc",
+          "exact_grid"
+        ],
+        "feasible": true,
+        "goal_id": "goal_41fce81a856d3a4c",
+        "parent_goal_id": null,
+        "priority": 0.3527589932136451,
+        "proposed_actions": [
+          "Penalize single-cell residual errors on support cross-validation when exact-grid candidates are available.",
+          "Add residual repair primitives that target boundary, row, column, and connected-component leftovers.",
+          "Report exact-grid success separately from mean cell accuracy."
+        ],
+        "rationale": "High cell accuracy with lower exact-grid accuracy indicates residual structural errors rather than complete failure.",
+        "source_evidence_ids": [
+          "evidence_aba17c6274fa8326"
+        ],
+        "strategy": "frontier",
+        "target_metric": "exact_alignment_from_cell_gains",
+        "target_value": 0.875,
+        "title": "Convert ARC cell gains into exact grids for full seed 42"
+      },
+      {
+        "current_value": 0.9244444444444444,
+        "domain": "arc_agi1_cell_accuracy",
+        "expected_transfer_tags": [
+          "arc",
+          "cell_accuracy"
+        ],
+        "feasible": true,
+        "goal_id": "goal_8d5ef0cc839345f1",
+        "parent_goal_id": null,
+        "priority": 0.34982843765808963,
+        "proposed_actions": [
+          "Expand candidate search around support-validated symbolic programs.",
+          "Track cell gains and exact-grid regressions as separate acceptance terms.",
+          "Retain deployment penalties for low-confidence symbolic programs."
+        ],
+        "rationale": "Cell accuracy remains below target, so there is still a measurable bounded optimization frontier.",
+        "source_evidence_ids": [
+          "evidence_aba17c6274fa8326"
+        ],
+        "strategy": "frontier",
+        "target_metric": "evolved_cell_accuracy",
+        "target_value": 1.0,
+        "title": "Improve ARC cell accuracy for full seed 42"
+      },
+      {
+        "current_value": 0.9577142857142857,
+        "domain": "arc_agi1_cell_accuracy",
+        "expected_transfer_tags": [
+          "arc",
+          "cell_accuracy"
+        ],
+        "feasible": true,
+        "goal_id": "goal_edd2a3214f5c2c70",
+        "parent_goal_id": null,
+        "priority": 0.34738200908666106,
+        "proposed_actions": [
+          "Expand candidate search around support-validated symbolic programs.",
+          "Track cell gains and exact-grid regressions as separate acceptance terms.",
+          "Retain deployment penalties for low-confidence symbolic programs."
+        ],
+        "rationale": "Cell accuracy remains below target, so there is still a measurable bounded optimization frontier.",
+        "source_evidence_ids": [
+          "evidence_93331781645f336b"
+        ],
+        "strategy": "frontier",
+        "target_metric": "evolved_cell_accuracy",
+        "target_value": 1.0,
+        "title": "Improve ARC cell accuracy for quick seed 42"
+      },
+      {
+        "current_value": 0.0,
+        "domain": "arc_agi1_variable_shape_adapter",
+        "expected_transfer_tags": [
+          "arc",
+          "exact_grid"
+        ],
+        "feasible": true,
+        "goal_id": "goal_ef75ed2a453da2b7",
+        "parent_goal_id": null,
+        "priority": 0.33553032454852416,
+        "proposed_actions": [
+          "Create a validation-only target split for the transfer domain.",
+          "Reuse the source mechanism only as a candidate generator, not as a final scorer.",
+          "Accept transfer only if held-out target metrics improve after selection is frozen."
+        ],
+        "rationale": "Same-shape repair mechanisms are plausible candidate generators for variable-shape adapters, but need a separate validation split.",
+        "source_evidence_ids": [
+          "evidence_aba17c6274fa8326"
+        ],
+        "strategy": "transfer",
+        "target_metric": "transfer_validated_delta",
+        "target_value": 0.45625,
+        "title": "Transfer arc, exact_grid to arc_agi1_variable_shape_adapter"
+      },
+      {
+        "current_value": 0.9375,
+        "domain": "operator_program_search",
+        "expected_transfer_tags": [
+          "operator_program",
+          "failure_grammar"
+        ],
+        "feasible": true,
+        "goal_id": "goal_c1c9776532db9185",
+        "parent_goal_id": null,
+        "priority": 0.3321854408750295,
+        "proposed_actions": [
+          "Use rejected candidate failure residues to bias the next candidate generator batch.",
+          "Increase diversity only in primitives that previously changed runtime behavior.",
+          "Keep validation and hidden-validation acceptance separate from final test scoring."
+        ],
+        "rationale": "Rejected validation candidates provide direct information for improving the candidate generator.",
+        "source_evidence_ids": [
+          "evidence_93331781645f336b"
+        ],
+        "strategy": "gap",
+        "target_metric": "accepted_program_rate",
+        "target_value": 1.0,
+        "title": "Improve candidate precision for quick seed 42"
+      }
+    ],
+    "initial_config": {
+      "cell_target": 0.98,
+      "coding_generalization_target": 1.0,
+      "creative_weight": 0.12,
+      "exact_target": 0.9,
+      "frontier_weight": 0.27999999999999997,
+      "gap_weight": 0.32,
+      "max_goals": 12,
+      "min_cell_gap": 0.02,
+      "min_exact_gap": 0.05,
+      "transfer_gain_floor": 0.05,
+      "transfer_threshold": 0.45,
+      "transfer_weight": 0.27999999999999997
+    },
+    "initial_score": 0.8254991964285715,
+    "score_delta": 0.008695466549142994
+  },
+  "metrics": {
+    "arc_exact_gap_goal_count": 2.0,
+    "cross_domain_goal_count": 0.0,
+    "external_evidence_count": 2.0,
+    "feasible_goal_rate": 1.0,
+    "generated_goal_count": 12.0,
+    "mean_goal_priority": 0.4463585103208468,
+    "meta_config_final_score": 0.8341946629777145,
+    "meta_config_score_delta": 0.008695466549142994,
+    "transfer_goal_count": 4.0
+  },
+  "seed": 42,
+  "transfer_hypotheses": [
+    {
+      "expected_gain": 0.22499999999999998,
+      "hypothesis_id": "transfer_5a86908a0229af1a",
+      "mechanism_tags": [
+        "1",
+        "agi",
+        "arc",
+        "cell",
+        "cell_accuracy",
+        "code",
+        "exact",
+        "exact_grid",
+        "exact_repair",
+        "external",
+        "guarded",
+        "json",
+        "level",
+        "loss_improvement",
+        "prediction",
+        "public",
+        "repair",
+        "results",
+        "rsi",
+        "same",
+        "seed42",
+        "shape",
+        "subset",
+        "training"
+      ],
+      "rationale": "A stronger source run and a weaker target run share mechanism tags, so transfer should be tested explicitly.",
+      "similarity": 1.0,
+      "source_evidence_id": "evidence_aba17c6274fa8326",
+      "target_domain": "external_arc_agi_same_shape_code_level_rsi:quick:seed42"
+    },
+    {
+      "expected_gain": 0.625,
+      "hypothesis_id": "transfer_32a808665eaae419",
+      "mechanism_tags": [
+        "arc",
+        "cell_accuracy",
+        "exact_grid",
+        "exact_repair"
+      ],
+      "rationale": "Positive ARC deltas should be checked across seeds before being treated as stable.",
+      "similarity": 0.56,
+      "source_evidence_id": "evidence_aba17c6274fa8326",
+      "target_domain": "arc_agi1_same_shape_unseen_seeds"
+    },
+    {
+      "expected_gain": 0.4,
+      "hypothesis_id": "transfer_24e6315128c1a0f3",
+      "mechanism_tags": [
+        "arc",
+        "cell_accuracy",
+        "exact_grid",
+        "exact_repair"
+      ],
+      "rationale": "Positive ARC deltas should be checked across seeds before being treated as stable.",
+      "similarity": 0.56,
+      "source_evidence_id": "evidence_93331781645f336b",
+      "target_domain": "arc_agi1_same_shape_unseen_seeds"
+    },
+    {
+      "expected_gain": 0.40625,
+      "hypothesis_id": "transfer_805d1bc461b98940",
+      "mechanism_tags": [
+        "arc",
+        "exact_grid"
+      ],
+      "rationale": "Same-shape repair mechanisms are plausible candidate generators for variable-shape adapters, but need a separate validation split.",
+      "similarity": 0.4740740740740741,
+      "source_evidence_id": "evidence_aba17c6274fa8326",
+      "target_domain": "arc_agi1_variable_shape_adapter"
+    },
+    {
+      "expected_gain": 0.26,
+      "hypothesis_id": "transfer_315ff87b01cd13cd",
+      "mechanism_tags": [
+        "arc",
+        "exact_grid"
+      ],
+      "rationale": "Same-shape repair mechanisms are plausible candidate generators for variable-shape adapters, but need a separate validation split.",
+      "similarity": 0.4740740740740741,
+      "source_evidence_id": "evidence_93331781645f336b",
+      "target_domain": "arc_agi1_variable_shape_adapter"
+    }
+  ]
+}

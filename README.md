@@ -66,8 +66,12 @@ Unsupported claims:
   - Compresses rejected candidates into reusable rules such as validation-only overfit, OOD-collapse proxy, memory-gate brittleness, wrong-world-model sensitivity, no behavior difference, exploding/NaN loss, deterministic replay failure, dead-code candidate, and high-validation-gain poor-transfer.
 - `evaluator_evolution.py`
   - Evolves bounded evaluator candidates for OOD-transfer penalty, validation-to-test gap penalty, runtime cost penalty, instability penalty, novelty bonus, failure-rule penalty, and self-model uncertainty penalty under probation and adversarial checks.
+- `research_goal_controller.py`
+  - Converts benchmark result files into bounded research goals, transfer hypotheses, and a meta-meta search over the goal-generation policy.
 - `benchmarks/code_level_rsi_benchmark.py`
   - Smoke/quick/full benchmark for bounded code-level RSI mechanics using synthesized operator programs, validation-only acceptance, self-model-guided candidate ranking, failure-grammar candidate rewriting, probationary evaluator evolution, frozen OOD test evaluation, reuse tracking, and manifests.
+- `benchmarks/research_goal_generation_benchmark.py`
+  - Reads existing evidence JSON files, generates auditable research goals, runs the bounded meta-meta goal-policy search, and writes a report plus manifest.
 - `interaction_residue_layer.py`
   - Core micro-turn events, baseline interaction policy, background task bus, evaluator, residues, and evaluator-compatible decision export.
 - `interaction_stream_runtime.py`
@@ -109,6 +113,7 @@ observe task/context
 -> validate candidate on validation tasks
 -> evolve probationary evaluator candidates under adversarial checks
 -> accept or reject with rollback
+-> generate benchmark-grounded research goals and transfer hypotheses for the next verified experiment
 ```
 
 This turns the repository from only a regression-adaptation prototype into a small closed-loop generalization testbed.
@@ -195,7 +200,7 @@ pip install pytest
 
 ```bash
 pytest -q
-# Expected after this upgrade: 168 passed
+# Expected after this upgrade: 174 passed
 ```
 
 ## Running the original sinusoid benchmark
@@ -357,6 +362,31 @@ The next-layer metrics include self-model prediction error, self-model error red
 
 Supported claim for this benchmark: the system can generate bounded operator programs, compile and execute them, rank them with a train/validation-only self-model, rewrite them using compressed failure rules, validate them under sandboxed validation-only and hidden OOD controls, evolve probationary evaluators under adversarial checks, reject/roll back failures, accept robust improvements, reuse accepted candidates, evaluate frozen accepted programs on held-out OOD tests, and write audit manifests. Unsupported claim: broad intelligence or autonomous open-ended recursive self-improvement.
 
+## Running the research-goal generation benchmark
+
+This benchmark reads existing result JSON files and generates bounded research goals, transfer hypotheses, and a meta-meta goal-policy update report:
+
+```bash
+python benchmarks/research_goal_generation_benchmark.py --mode smoke --seed 42 --evidence results/arc_external_rsi_exact_repair_guarded_quick_seed42.json results/arc_external_rsi_exact_repair_guarded_full_seed42.json
+```
+
+By default, results are written to:
+
+- `results/research_goal_generation_<mode>_seed<seed>.json`
+- `results/research_goal_generation_<mode>_seed<seed>.manifest.json`
+
+Supported claim for this benchmark: the repository can turn measured benchmark gaps into auditable next research goals, propose transfer targets from successful mechanisms, and mutate the goal-generation policy itself under a bounded meta-meta scoring loop. Unsupported claim: this does not improve ARC or coding scores by itself; generated goals must be implemented and re-benchmarked before they count as capability gains.
+
+Local verification for this integration:
+
+```bash
+python -m pytest tests/test_research_goal_controller.py -q
+python -m pytest tests/test_research_goal_controller.py tests/test_arc_external_rsi_benchmark.py tests/test_code_level_rsi.py -q
+python -m pytest -q
+```
+
+Observed result: focused research-goal tests passed, focused ARC/code-level regression tests passed, and the full suite passed with `172 passed` before the later ARC exact-repair extension.
+
 ## Guarded RSI generalization upgrade
 
 The current RSI upgrade adds real executable behavior and stricter acceptance rather than only wrapping the benchmark surface:
@@ -410,7 +440,7 @@ Seed-42 measurements on the same-shape ARC subset:
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | smoke | `154` | `4` | `6` | `0.5911805556` | `0.8768518519` | `+0.2856712963` | `0.0 -> 0.25` |
 | quick | `169` | `5` | `15` | `0.6445714286` | `0.9577142857` | `+0.3131428571` | `0.0 -> 0.4` |
-| full | `185` | `8` | `23` | `0.6680555556` | `0.9244444444` | `+0.2563888889` | `0.0 -> 0.625` |
+| full | `185` | `8` | `23` | `0.6680555556` | `0.9587500000` | `+0.2906944444` | `0.0 -> 0.875` |
 
 Interpretation: the operator/program RSI loop now shows a larger held-out cell-accuracy improvement on the public ARC-AGI-1 same-shape subset, including full mode, and quick/full mode now reach nonzero exact-grid success on held-out tasks. It is still not an official ARC leaderboard result. In some modes symbolic programs can trade cross-entropy loss for better discrete grids, so cell and exact-grid accuracy are the primary proof metrics for this adapter.
 
@@ -432,7 +462,7 @@ The ARC adapter now includes an OMEGA-THDSE-inspired high-dimensional structural
 - `support_geometric_transform_mapping` uses HDC signatures as a support-only tie-breaker for geometric/color transforms.
 - `support_nested_ring_reversal_mapping` adds a bounded topological rule for nested same-shape ARC ring tasks.
 - `support_translation_mapping` learns support-only object translations with drop/clamp boundary modes and HDC tie-breaking.
-- `support_exact_repair_search` tries support-only exact-grid repair programs for binary mask recoloring, edge reflection, marker-rectangle fill, 2x2 corner projection, and rowwise terminal shifts.
+- `support_exact_repair_search` tries support-only exact-grid repair programs for binary mask recoloring, edge reflection, marker-rectangle fill, 2x2 corner projection, rowwise terminal shifts, marker-to-block projection, and object lift-by-height rules.
 - Support-symbolic candidates may pass with a small hidden-cell tolerance only when they have positive validation gain, no exact-grid regression, deterministic replay, runtime behavior difference, and later pass per-task support cross-validation.
 
 Quick-mode ARC rerun after this upgrade:
@@ -450,12 +480,21 @@ Full-mode seed 42 now improves after the support-translation deployment guard: b
 
 The exact-repair upgrade changes the final ARC selection pressure from only "more cells correct" toward support-validated exact-grid programs. The repair search is still support-only: it does not read held-out test outputs during candidate generation, validation, or final program selection.
 
-| Mode/seed | Baseline cell | Previous guarded cell | Exact-repair cell | Previous exact | Exact-repair exact |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| quick/42 | `0.6445714286` | `0.9475510204` | `0.9577142857` | `0.2` | `0.4` |
-| full/42 | `0.6680555556` | `0.7827777778` | `0.9244444444` | `0.0` | `0.625` |
+| Mode/seed | Baseline cell | Previous guarded cell | Exact-repair cell | Projected-repair cell | Previous exact | Exact-repair exact | Projected-repair exact |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| quick/42 | `0.6445714286` | `0.9475510204` | `0.9577142857` | `0.9577142857` | `0.2` | `0.4` | `0.4` |
+| full/42 | `0.6680555556` | `0.7827777778` | `0.9244444444` | `0.9587500000` | `0.0` | `0.625` | `0.875` |
 
-Full seed 42 exact task breakdown after the exact-repair guard: `5 / 8` held-out same-shape ARC tasks exact, with exact solutions on `93b581b8`, `025d127b`, `f76d97a5`, `af902bf9`, and `496994bd`.
+Full seed 42 exact task breakdown after marker-to-block projection and object lift-by-height rules: `7 / 8` held-out same-shape ARC tasks exact, with exact solutions on `93b581b8`, `025d127b`, `1f642eb9`, `f76d97a5`, `af902bf9`, `496994bd`, and `5521c0d9`. The remaining unsolved full seed-42 task is `aba27056`.
+
+Local verification for this exact-repair extension:
+
+```bash
+python -m pytest tests/test_arc_external_rsi_benchmark.py -q
+python -m pytest -q
+```
+
+Observed result: focused ARC tests passed and the full suite passed with `174 passed`.
 
 ## External HumanEval coding benchmark adapter
 

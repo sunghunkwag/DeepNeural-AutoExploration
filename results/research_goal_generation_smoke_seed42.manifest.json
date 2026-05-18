@@ -1,0 +1,57 @@
+{
+  "anti_cheat_checks_passed": [
+    "benchmark evidence loaded from explicit JSON result files",
+    "research goals generated from published metrics and limitations",
+    "meta-meta loop mutates goal-policy configuration only",
+    "transfer hypotheses remain proposals until separately benchmarked",
+    "no generated goal is counted as held-out benchmark improvement"
+  ],
+  "command": "benchmarks\\research_goal_generation_benchmark.py --mode smoke --seed 42 --evidence results\\arc_external_rsi_exact_repair_guarded_quick_seed42.json results\\arc_external_rsi_exact_repair_guarded_full_seed42.json --output results\\research_goal_generation_smoke_seed42.json",
+  "config": {
+    "benchmark": "research_goal_generation_controller",
+    "evidence_paths": [
+      "results\\arc_external_rsi_exact_repair_guarded_quick_seed42.json",
+      "results\\arc_external_rsi_exact_repair_guarded_full_seed42.json"
+    ],
+    "meta_config": {
+      "candidates_per_round": 6,
+      "mutation_scale": 0.12,
+      "rounds": 2,
+      "seed": 42
+    },
+    "mode": "smoke",
+    "policy_config": {
+      "cell_target": 0.98,
+      "coding_generalization_target": 1.0,
+      "creative_weight": 0.12,
+      "exact_target": 0.9,
+      "frontier_weight": 0.27999999999999997,
+      "gap_weight": 0.32,
+      "max_goals": 12,
+      "min_cell_gap": 0.02,
+      "min_exact_gap": 0.05,
+      "transfer_gain_floor": 0.05,
+      "transfer_threshold": 0.45,
+      "transfer_weight": 0.27999999999999997
+    },
+    "seed": 42
+  },
+  "config_hash": "aa26149331fa67ee",
+  "evidence_paths": [
+    "results\\arc_external_rsi_exact_repair_guarded_quick_seed42.json",
+    "results\\arc_external_rsi_exact_repair_guarded_full_seed42.json"
+  ],
+  "git_commit": "07da33ee820ff02e6018dece34d709e18f97926b",
+  "metric_summary": {
+    "arc_exact_gap_goal_count": 2.0,
+    "cross_domain_goal_count": 0.0,
+    "external_evidence_count": 2.0,
+    "feasible_goal_rate": 1.0,
+    "generated_goal_count": 12.0,
+    "mean_goal_priority": 0.4463585103208468,
+    "meta_config_final_score": 0.8341946629777145,
+    "meta_config_score_delta": 0.008695466549142994,
+    "transfer_goal_count": 4.0
+  },
+  "timestamp": "2026-05-18T10:02:56.428079+00:00"
+}

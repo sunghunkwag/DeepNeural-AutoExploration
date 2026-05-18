@@ -291,6 +291,111 @@ def test_arc_exact_repair_solves_corner_projection_and_terminal_shift():
     _run_support_exact_repair(shift_payload)
 
 
+def test_arc_exact_repair_solves_marker_projection_to_block():
+    def project(grid):
+        out = [list(row) for row in grid]
+        for r, row in enumerate(grid):
+            for c, value in enumerate(row):
+                if value not in {0, 8}:
+                    if 2 <= r <= 4 and c < 2:
+                        out[r][2] = value
+                    if 2 <= r <= 4 and c > 4:
+                        out[r][4] = value
+                    if 2 <= c <= 4 and r < 2:
+                        out[2][c] = value
+                    if 2 <= c <= 4 and r > 4:
+                        out[4][c] = value
+        return out
+
+    train_a = [
+        [0, 0, 5, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0],
+        [6, 0, 8, 8, 8, 0],
+        [0, 0, 8, 8, 8, 2],
+        [0, 0, 8, 8, 8, 0],
+        [0, 0, 0, 3, 0, 0],
+    ]
+    train_b = [
+        [0, 0, 0, 7, 0, 0],
+        [0, 0, 0, 0, 0, 0],
+        [0, 0, 8, 8, 8, 4],
+        [1, 0, 8, 8, 8, 0],
+        [0, 0, 8, 8, 8, 0],
+        [0, 0, 9, 0, 0, 0],
+    ]
+    test = [
+        [0, 0, 3, 0, 6, 0],
+        [0, 0, 0, 0, 0, 0],
+        [9, 0, 8, 8, 8, 0],
+        [0, 0, 8, 8, 8, 7],
+        [0, 0, 8, 8, 8, 0],
+        [0, 0, 0, 2, 0, 0],
+    ]
+    payload = {
+        "train": [
+            {"input": train_a, "output": project(train_a)},
+            {"input": train_b, "output": project(train_b)},
+        ],
+        "test": [{"input": test, "output": project(test)}],
+    }
+    details = _run_support_exact_repair(payload)
+    assert any(key.startswith("support_exact_repair_method:project_markers_to_block") for key in details.primitive_effects)
+
+
+def test_arc_exact_repair_solves_move_objects_up_by_height():
+    def lift(grid):
+        rows = len(grid)
+        cols = len(grid[0])
+        out = [[0 for _ in range(cols)] for _ in range(rows)]
+        colors = sorted({value for row in grid for value in row if value})
+        for color in colors:
+            cells = [(r, c) for r, row in enumerate(grid) for c, value in enumerate(row) if value == color]
+            top = min(r for r, _ in cells)
+            bottom = max(r for r, _ in cells)
+            height = bottom - top + 1
+            for r, c in cells:
+                if r - height >= 0:
+                    out[r - height][c] = color
+        return out
+
+    train_a = [
+        [0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0],
+        [1, 1, 0, 0, 3, 3, 3],
+        [1, 1, 0, 2, 2, 3, 3],
+        [1, 1, 0, 2, 2, 3, 3],
+    ]
+    train_b = [
+        [0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0],
+        [4, 4, 4, 0, 0, 0, 0],
+        [4, 4, 4, 0, 5, 5, 0],
+        [4, 4, 4, 0, 5, 5, 0],
+        [4, 4, 4, 6, 6, 0, 0],
+    ]
+    test = [
+        [0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0],
+        [7, 7, 0, 0, 0, 0, 0],
+        [7, 7, 0, 0, 8, 8, 8],
+        [7, 7, 9, 9, 8, 8, 8],
+        [7, 7, 9, 9, 8, 8, 8],
+        [7, 7, 9, 9, 8, 8, 8],
+    ]
+    payload = {
+        "train": [
+            {"input": train_a, "output": lift(train_a)},
+            {"input": train_b, "output": lift(train_b)},
+        ],
+        "test": [{"input": test, "output": lift(test)}],
+    }
+    details = _run_support_exact_repair(payload)
+    assert any(key.startswith("support_exact_repair_method:move_objects_up_by_height") for key in details.primitive_effects)
+
+
 def test_arc_external_rsi_smoke_reports_baseline_to_evolved(tmp_path, monkeypatch):
     root = _write_arc_fixture(tmp_path / "arc", count=8)
 

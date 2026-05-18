@@ -102,30 +102,37 @@ Interpretation:
 
 - The OMEGA-inspired path produced a real quick-mode improvement, mostly by solving a nested-ring ARC task that the prior DSL missed.
 - The later support-translation guard produced a verified full seed-42 cell-accuracy improvement over the previous HDC/topological full result.
-- The later exact-repair search produced verified full seed-42 exact-grid improvement.
+- The later exact-repair search produced verified full seed-42 exact-grid improvement, and the marker-projection/object-lift extension raised the current full seed-42 exact result again.
 - This is bounded symbolic/topological program induction, not AGI, quasi-AGI, or open-ended self-improvement.
 
 ## Exact-Repair ARC Rerun
 
-`support_exact_repair_search` is an executable DSL primitive that tries support-only repair programs for binary mask recoloring, edge reflection, marker-rectangle fill, 2x2 corner projection, and rowwise terminal shifts. Candidate acceptance still uses validation and hidden validation only. Final deployment still uses leave-one-demonstration-out support cross-validation, and low-confidence exact-repair deployment is penalized.
+`support_exact_repair_search` is an executable DSL primitive that tries support-only repair programs for binary mask recoloring, edge reflection, marker-rectangle fill, 2x2 corner projection, rowwise terminal shifts, marker-to-block projection, and object lift-by-height rules. Candidate acceptance still uses validation and hidden validation only. Final deployment still uses leave-one-demonstration-out support cross-validation, and low-confidence exact-repair deployment is penalized.
 
-| Mode/seed | Baseline cell | Previous guarded cell | Exact-repair cell | Cell delta | Previous exact | Exact-repair exact |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| quick/42 | `0.6445714286` | `0.9475510204` | `0.9577142857` | `+0.3131428571` | `0.2` | `0.4` |
-| full/42 | `0.6680555556` | `0.7827777778` | `0.9244444444` | `+0.2563888889` | `0.0` | `0.625` |
+Additional commands:
 
-Full seed-42 exact task breakdown after exact repair:
+```bash
+python benchmarks/arc_external_rsi_benchmark.py --mode quick --seed 42 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_exact_repair_projected_quick_seed42.json
+python benchmarks/arc_external_rsi_benchmark.py --mode full --seed 42 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_exact_repair_projected_full_seed42.json
+```
+
+| Mode/seed | Baseline cell | Previous guarded cell | Exact-repair cell | Projected-repair cell | Cell delta | Previous exact | Exact-repair exact | Projected-repair exact |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| quick/42 | `0.6445714286` | `0.9475510204` | `0.9577142857` | `0.9577142857` | `+0.3131428571` | `0.2` | `0.4` | `0.4` |
+| full/42 | `0.6680555556` | `0.7827777778` | `0.9244444444` | `0.9587500000` | `+0.2906944444` | `0.0` | `0.625` | `0.875` |
+
+Full seed-42 exact task breakdown after marker-to-block projection and object lift-by-height:
 
 | Task ID | Baseline cell | Evolved cell | Exact |
 | --- | ---: | ---: | ---: |
 | `93b581b8` | `0.555556` | `1.000000` | yes |
 | `025d127b` | `0.820000` | `1.000000` | yes |
 | `aba27056` | `0.640000` | `0.670000` | no |
-| `1f642eb9` | `0.770000` | `0.930000` | no |
+| `1f642eb9` | `0.770000` | `1.000000` | yes |
 | `f76d97a5` | `0.640000` | `1.000000` | yes |
 | `af902bf9` | `0.790000` | `1.000000` | yes |
 | `496994bd` | `0.400000` | `1.000000` | yes |
-| `5521c0d9` | `0.728889` | `0.795556` | no |
+| `5521c0d9` | `0.728889` | `1.000000` | yes |
 
 ## HumanEval Coding Benchmark Protocol
 
@@ -174,10 +181,11 @@ Observed result:
 
 - Focused benchmark/operator tests passed.
 - Full suite passed after the HDC/topological/translation/exact-repair ARC upgrade: `168 passed`.
+- Full suite passed after the research-goal and marker-projection/object-lift exact-repair extension: `174 passed`.
 
 ## Remaining Work
 
-- Increase ARC exact-grid success beyond `5 / 8` on the current full seed-42 same-shape split.
+- Increase ARC exact-grid success beyond `7 / 8` on the current full seed-42 same-shape split.
 - Add a non-template coding synthesizer or LLM-backed coding generator if credentials and model policy permit.
 - Add more seeds and confidence intervals.
 - Evaluate on variable-shape ARC tasks.
