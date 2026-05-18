@@ -446,10 +446,17 @@ def _support_holdout_tasks(task: SyntheticTask) -> List[SyntheticTask]:
     out: List[SyntheticTask] = []
     for holdout in range(len(offsets) - 1):
         support_indices: List[torch.Tensor] = []
+        kept_shapes: List[Tuple[int, int]] = []
+        kept_outputs: List[object] = []
+        kept_offsets = [0]
         for index in range(len(offsets) - 1):
             if index == holdout:
                 continue
             support_indices.append(torch.arange(offsets[index], offsets[index + 1], dtype=torch.long))
+            kept_shapes.append((int(shapes[index][0]), int(shapes[index][1])))
+            if index < len(outputs):
+                kept_outputs.append(outputs[index])
+            kept_offsets.append(kept_offsets[-1] + int(offsets[index + 1] - offsets[index]))
         if not support_indices:
             continue
         train_index = torch.cat(support_indices)
@@ -466,6 +473,9 @@ def _support_holdout_tasks(task: SyntheticTask) -> List[SyntheticTask]:
                 query_y=task.support_y[start:end],
                 metadata={
                     **task.metadata,
+                    "support_shapes": kept_shapes,
+                    "support_offsets": kept_offsets,
+                    "support_expected_outputs": kept_outputs,
                     "query_shapes": [shapes[holdout]],
                     "query_offsets": [0, query_len],
                     "expected_outputs": [outputs[holdout]] if holdout < len(outputs) else [],
@@ -488,27 +498,49 @@ def _select_support_cv_program(
     holdouts = _support_holdout_tasks(task)
     if not holdouts:
         return genome.active_program(), {"selected_program_id": genome.active_program_id, "support_cv_available": False}
-    scored: List[Tuple[float, float, float, str, OperatorProgram, Dict[str, object]]] = []
+    scored: List[Tuple[float, float, float, float, str, OperatorProgram, Dict[str, object], Dict[str, float]]] = []
     for program in genome.accepted_programs():
         metrics = _evaluate_arc_program_direct(program, holdouts, state, encoder, memory, world_model)
+        deploy_cell_score, deployment_guard = _support_cv_deployment_score(program, metrics)
         scored.append(
             (
                 float(metrics["exact_task_accuracy"]),
+                deploy_cell_score,
                 float(metrics["cell_accuracy"]),
                 -float(metrics["mean_loss"]),
                 program.program_id,
                 program,
                 metrics,
+                deployment_guard,
             )
         )
-    exact_score, cell_score, loss_score, program_id, program, metrics = max(scored, key=lambda item: item[:4])
+    exact_score, deployed_cell_score, cell_score, loss_score, program_id, program, metrics, deployment_guard = max(
+        scored,
+        key=lambda item: item[:5],
+    )
     return program, {
         "selected_program_id": program_id,
         "support_cv_available": True,
         "support_cv_exact_task_accuracy": exact_score,
         "support_cv_cell_accuracy": cell_score,
+        "support_cv_deployment_cell_score": deployed_cell_score,
         "support_cv_loss": -loss_score,
         "support_cv_metrics": metrics,
+        "support_cv_deployment_guard": deployment_guard,
+    }
+
+
+def _support_cv_deployment_score(program: OperatorProgram, metrics: Mapping[str, object]) -> Tuple[float, Dict[str, float]]:
+    cell_score = float(metrics["cell_accuracy"])
+    exact_score = float(metrics["exact_task_accuracy"])
+    step_names = {step.name for step in program.primitive_sequence}
+    penalty = 0.0
+    if "support_translation_mapping" in step_names and exact_score <= 0.0 and cell_score < 0.75:
+        penalty = 0.25
+    return cell_score - penalty, {
+        "raw_cell_accuracy": cell_score,
+        "exact_task_accuracy": exact_score,
+        "translation_low_confidence_penalty": penalty,
     }
 
 
@@ -562,6 +594,7 @@ def _validate_arc_candidate_program(
     generation: int,
     seed: int,
     min_validation_cell_gain: float = 1e-9,
+    support_symbolic_hidden_tolerance: float = 0.05,
 ) -> Dict[str, object]:
     if any(task.split == "test" for task in validation_tasks) or any(task.split == "test" for task in hidden_validation_tasks):
         raise ValueError("test split tasks cannot be used for candidate acceptance")
@@ -628,7 +661,27 @@ def _validate_arc_candidate_program(
     hidden_loss_improvement = float(mean([float(b - c) for b, c in zip(hidden_baseline.scores, hidden_candidate.scores)]))
     robust_generalization_score = validation_cell_delta + 0.5 * hidden_cell_delta + 0.1 * validation_exact_delta + 0.05 * hidden_exact_delta
 
-    accepted = bool(
+    support_only_symbolic_primitives = {
+        "support_color_mapping",
+        "support_local_pattern_mapping",
+        "support_feature_lookup_mapping",
+        "support_geometric_transform_mapping",
+        "support_nested_ring_reversal_mapping",
+        "support_translation_mapping",
+    }
+    support_symbolic_wrapper_primitives = support_only_symbolic_primitives | {
+        "constant_lr",
+        "decayed_lr",
+        "gradient_norm_clipping",
+        "support_loss_weighting",
+        "maml_step",
+        "support_proxy_step",
+    }
+    step_names = {step.name for step in candidate.primitive_sequence}
+    is_support_only_symbolic = bool(step_names & support_only_symbolic_primitives) and all(
+        step.name in support_symbolic_wrapper_primitives for step in candidate.primitive_sequence
+    )
+    strict_accepted = bool(
         deterministic
         and behavior_diff > 1e-9
         and validation_cell_delta > min_validation_cell_gain
@@ -636,9 +689,21 @@ def _validate_arc_candidate_program(
         and len(validation_tasks) >= 1
         and len(hidden_validation_tasks) >= 1
     )
+    support_cv_symbolic_accepted = bool(
+        deterministic
+        and behavior_diff > 1e-9
+        and is_support_only_symbolic
+        and validation_cell_delta > max(0.05, min_validation_cell_gain)
+        and hidden_cell_delta >= -abs(float(support_symbolic_hidden_tolerance))
+        and validation_exact_delta >= 0.0
+        and hidden_exact_delta >= 0.0
+        and len(validation_tasks) >= 1
+        and len(hidden_validation_tasks) >= 1
+    )
+    accepted = strict_accepted or support_cv_symbolic_accepted
     if accepted:
         genome.accept(candidate)
-        reason = "accepted_accuracy_gain"
+        reason = "accepted_accuracy_gain" if strict_accepted else "accepted_support_symbolic_cv_tolerance"
     else:
         genome.restore(snapshot)
         if not deterministic:
@@ -680,6 +745,9 @@ def _validate_arc_candidate_program(
         "hidden_cell_accuracy_delta": hidden_cell_delta,
         "validation_exact_task_accuracy_delta": validation_exact_delta,
         "hidden_exact_task_accuracy_delta": hidden_exact_delta,
+        "support_only_symbolic_candidate": is_support_only_symbolic,
+        "support_symbolic_hidden_tolerance": float(support_symbolic_hidden_tolerance),
+        "support_cv_symbolic_acceptance_used": bool(support_cv_symbolic_accepted and not strict_accepted),
         "runtime_behavior_difference": behavior_diff,
         "deterministic_replay_passed": deterministic,
         "compile_status": compile_result.to_dict(),

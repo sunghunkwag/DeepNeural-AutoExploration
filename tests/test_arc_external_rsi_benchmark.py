@@ -2,6 +2,10 @@ import json
 import math
 from pathlib import Path
 
+import torch
+
+from adaptation_operators import OperatorExecutionContext
+from operator_dsl import OperatorProgram, PrimitiveStep, compile_operator_program
 from benchmarks import arc_external_rsi_benchmark as arc_benchmark
 
 
@@ -46,7 +50,113 @@ def test_arc_loader_uses_external_same_shape_tasks(tmp_path):
     assert loaded.tasks[0].support_x.shape[1] == arc_benchmark.ARC_FEATURE_DIM
     assert loaded.tasks[0].metadata["source"] == arc_benchmark.ARC_REPO_URL
     assert len(loaded.tasks[0].metadata["support_offsets"]) == 3
-    assert len(arc_benchmark._support_holdout_tasks(loaded.tasks[0])) == 2
+    holdouts = arc_benchmark._support_holdout_tasks(loaded.tasks[0])
+    assert len(holdouts) == 2
+    assert holdouts[0].metadata["support_offsets"][-1] == holdouts[0].support_x.shape[0]
+
+
+def test_arc_geometric_hdc_program_solves_support_only_flip():
+    def hflip(grid):
+        return [list(reversed(row)) for row in grid]
+
+    payload = {
+        "train": [
+            {"input": [[1, 2], [3, 4]], "output": hflip([[1, 2], [3, 4]])},
+            {"input": [[5, 6], [7, 8]], "output": hflip([[5, 6], [7, 8]])},
+        ],
+        "test": [{"input": [[2, 1], [4, 3]], "output": hflip([[2, 1], [4, 3]])}],
+    }
+    task = arc_benchmark._arc_payload_to_task("geom_hflip", "test", payload)
+    program = OperatorProgram(
+        "test_support_geometric_transform_mapping",
+        (PrimitiveStep("support_geometric_transform_mapping"),),
+    )
+    context = OperatorExecutionContext(
+        model=torch.nn.Linear(arc_benchmark.ARC_FEATURE_DIM, 10),
+        task=task,
+        task_embedding=torch.zeros(8),
+        base_inner_lr=0.01,
+        inner_steps=1,
+    )
+    _, details = compile_operator_program(program).adapt_params(context)
+    assert details.prediction_override is not None
+    metrics = arc_benchmark._grid_metrics_from_predictions(task, details.prediction_override)
+    assert metrics["exact"] is True
+    assert metrics["cell_accuracy"] == 1.0
+    assert details.primitive_effects["support_geometric_hdc_dimension"] == 10000.0
+
+
+def test_arc_nested_ring_reversal_program_solves_support_only_rings():
+    def rings(colors):
+        size = len(colors) * 2
+        return [
+            [colors[min(r, c, size - 1 - r, size - 1 - c)] for c in range(size)]
+            for r in range(size)
+        ]
+
+    train_a = rings([4, 2, 1])
+    train_b = rings([8, 6, 3])
+    test = rings([7, 5, 9, 1])
+    payload = {
+        "train": [
+            {"input": train_a, "output": rings(list(reversed([4, 2, 1])))},
+            {"input": train_b, "output": rings(list(reversed([8, 6, 3])))},
+        ],
+        "test": [{"input": test, "output": rings(list(reversed([7, 5, 9, 1])))}],
+    }
+    task = arc_benchmark._arc_payload_to_task("nested_rings", "test", payload)
+    program = OperatorProgram(
+        "test_support_nested_ring_reversal_mapping",
+        (PrimitiveStep("support_nested_ring_reversal_mapping"),),
+    )
+    context = OperatorExecutionContext(
+        model=torch.nn.Linear(arc_benchmark.ARC_FEATURE_DIM, 10),
+        task=task,
+        task_embedding=torch.zeros(8),
+        base_inner_lr=0.01,
+        inner_steps=1,
+    )
+    _, details = compile_operator_program(program).adapt_params(context)
+    assert details.prediction_override is not None
+    metrics = arc_benchmark._grid_metrics_from_predictions(task, details.prediction_override)
+    assert metrics["exact"] is True
+    assert metrics["cell_accuracy"] == 1.0
+    assert details.primitive_effects["support_nested_ring_hdc_dimension"] == 10000.0
+
+
+def test_arc_translation_program_solves_support_only_shift():
+    def shift_right(grid):
+        return [[0] + row[:-1] for row in grid]
+
+    train_a = [[0, 6, 6, 0], [0, 6, 0, 6], [0, 0, 6, 0]]
+    train_b = [[0, 8, 8, 8], [0, 8, 0, 0], [0, 0, 8, 8]]
+    test = [[0, 4, 4, 4], [0, 4, 0, 0], [0, 0, 4, 4]]
+    payload = {
+        "train": [
+            {"input": train_a, "output": shift_right(train_a)},
+            {"input": train_b, "output": shift_right(train_b)},
+        ],
+        "test": [{"input": test, "output": shift_right(test)}],
+    }
+    task = arc_benchmark._arc_payload_to_task("translation", "test", payload)
+    program = OperatorProgram(
+        "test_support_translation_mapping",
+        (PrimitiveStep("support_translation_mapping"),),
+    )
+    context = OperatorExecutionContext(
+        model=torch.nn.Linear(arc_benchmark.ARC_FEATURE_DIM, 10),
+        task=task,
+        task_embedding=torch.zeros(8),
+        base_inner_lr=0.01,
+        inner_steps=1,
+    )
+    _, details = compile_operator_program(program).adapt_params(context)
+    assert details.prediction_override is not None
+    metrics = arc_benchmark._grid_metrics_from_predictions(task, details.prediction_override)
+    assert metrics["exact"] is True
+    assert metrics["cell_accuracy"] == 1.0
+    assert details.primitive_effects["support_translation_hdc_dimension"] == 10000.0
+    assert details.primitive_effects["support_translation_dc"] == 1.0
 
 
 def test_arc_external_rsi_smoke_reports_baseline_to_evolved(tmp_path, monkeypatch):

@@ -22,6 +22,7 @@ import torch
 import torch.nn.functional as F
 
 from adaptation_operators import AdaptationOperator, OperatorExecutionContext, OperatorGene, OperatorTrace
+from arc_hdc_signature import HDC_DIMENSION, grid_pair_similarity
 from cognitive_core import EpisodicMemory, MemoryRecord, WorldModel
 from maml_functional import functional_forward
 
@@ -57,6 +58,9 @@ OBJECTIVE_PRIMITIVES = (
     "support_color_mapping",
     "support_local_pattern_mapping",
     "support_feature_lookup_mapping",
+    "support_geometric_transform_mapping",
+    "support_nested_ring_reversal_mapping",
+    "support_translation_mapping",
 )
 SCHEDULE_PRIMITIVES = (
     "constant_lr",
@@ -531,6 +535,247 @@ class _ProgramState:
     def _op_support_feature_lookup_mapping(self, step: PrimitiveStep) -> None:
         self._support_lookup_mapping(str(step.args.get("mode", "feature")))
 
+    def _op_support_geometric_transform_mapping(self, step: PrimitiveStep) -> None:
+        if getattr(self.context.task, "metadata", {}).get("target_type") != "classification":
+            self.details.primitive_effects["support_geometric_transform_mapping"] = 0.0
+            return
+
+        metadata = getattr(self.context.task, "metadata", {})
+        support_grids = self._feature_grids(
+            self.context.task.support_x,
+            metadata.get("support_shapes", []),
+            metadata.get("support_offsets", []),
+        )
+        output_grids = metadata.get("support_expected_outputs", [])
+        query_grids = self._feature_grids(
+            self.context.task.query_x,
+            metadata.get("query_shapes", []),
+            metadata.get("query_offsets", []),
+        )
+        if not support_grids or len(support_grids) != len(output_grids) or not query_grids:
+            self.details.primitive_effects["support_geometric_transform_mapping"] = 0.0
+            return
+
+        global_counts = torch.bincount(torch.clamp(self.context.task.support_y.reshape(-1).long(), 0, 9), minlength=10)
+        global_default = int(torch.argmax(global_counts).item()) if int(global_counts.sum().item()) > 0 else 0
+        candidates = []
+        for transform_name, transform_fn in self._grid_transforms().items():
+            votes: Dict[int, Dict[int, int]] = {}
+            valid = True
+            for input_grid, expected_grid in zip(support_grids, output_grids):
+                transformed = transform_fn(input_grid)
+                if self._grid_shape(transformed) != self._grid_shape(expected_grid):
+                    valid = False
+                    break
+                for in_row, out_row in zip(transformed, expected_grid):
+                    for in_color, out_color in zip(in_row, out_row):
+                        src = int(max(0, min(9, int(in_color))))
+                        dst = int(max(0, min(9, int(out_color))))
+                        votes.setdefault(src, {})
+                        votes[src][dst] = votes[src].get(dst, 0) + 1
+            if not valid:
+                continue
+            mapping: Dict[int, int] = {}
+            confidence: Dict[int, float] = {}
+            for color, color_votes in votes.items():
+                total = max(1, sum(color_votes.values()))
+                label, count = max(color_votes.items(), key=lambda item: (item[1], -item[0]))
+                mapping[color] = int(label)
+                confidence[color] = float(count / total)
+
+            cell_total = 0
+            cell_correct = 0
+            exact_total = 0
+            exact_correct = 0
+            for input_grid, expected_grid in zip(support_grids, output_grids):
+                transformed = transform_fn(input_grid)
+                predicted = self._apply_color_mapping(transformed, mapping, global_default)
+                exact_total += 1
+                exact_correct += 1 if predicted == expected_grid else 0
+                for pred_row, exp_row in zip(predicted, expected_grid):
+                    for pred_color, exp_color in zip(pred_row, exp_row):
+                        cell_total += 1
+                        cell_correct += 1 if int(pred_color) == int(exp_color) else 0
+            cell_accuracy = cell_correct / max(1, cell_total)
+            exact_accuracy = exact_correct / max(1, exact_total)
+            mean_confidence = sum(confidence.values()) / max(1, len(confidence))
+            candidates.append(
+                (
+                    exact_accuracy,
+                    cell_accuracy,
+                    mean_confidence,
+                    -len(mapping),
+                    transform_name,
+                    transform_fn,
+                    mapping,
+                )
+            )
+
+        if not candidates:
+            self.details.primitive_effects["support_geometric_transform_mapping"] = 0.0
+            return
+
+        best_exact, best_cell = max(candidates, key=lambda item: item[:2])[:2]
+        tied = [item for item in candidates if item[0] == best_exact and item[1] == best_cell]
+        hdc_ranked = []
+        for exact_accuracy, cell_accuracy, mean_confidence, neg_mapping_size, transform_name, transform_fn, mapping in tied:
+            hdc_scores = []
+            for input_grid, expected_grid in zip(support_grids, output_grids):
+                predicted = self._apply_color_mapping(transform_fn(input_grid), mapping, global_default)
+                hdc_scores.append(grid_pair_similarity(predicted, expected_grid))
+            hdc_similarity = sum(hdc_scores) / max(1, len(hdc_scores))
+            hdc_ranked.append(
+                (
+                    exact_accuracy,
+                    cell_accuracy,
+                    hdc_similarity,
+                    mean_confidence,
+                    neg_mapping_size,
+                    transform_name,
+                    transform_fn,
+                    mapping,
+                )
+            )
+        exact_accuracy, cell_accuracy, hdc_similarity, mean_confidence, _, transform_name, transform_fn, mapping = max(hdc_ranked, key=lambda item: item[:6])
+        predicted_query = [
+            self._apply_color_mapping(transform_fn(grid), mapping, global_default)
+            for grid in query_grids
+        ]
+        logits = self._logits_from_grids(predicted_query, self.context.task.query_x.device)
+        self.details.prediction_override = logits
+        self.details.objective_signal += float(exact_accuracy + cell_accuracy + hdc_similarity)
+        self.details.primitive_effects["support_geometric_transform_mapping"] = float(cell_accuracy)
+        self.details.primitive_effects["support_geometric_exact"] = float(exact_accuracy)
+        self.details.primitive_effects["support_geometric_hdc_similarity"] = float(hdc_similarity)
+        self.details.primitive_effects["support_geometric_hdc_dimension"] = float(HDC_DIMENSION)
+        self.details.primitive_effects[f"support_geometric_transform:{transform_name}"] = float(mean_confidence)
+
+    def _op_support_nested_ring_reversal_mapping(self, step: PrimitiveStep) -> None:
+        if getattr(self.context.task, "metadata", {}).get("target_type") != "classification":
+            self.details.primitive_effects["support_nested_ring_reversal_mapping"] = 0.0
+            return
+
+        metadata = getattr(self.context.task, "metadata", {})
+        support_grids = self._feature_grids(
+            self.context.task.support_x,
+            metadata.get("support_shapes", []),
+            metadata.get("support_offsets", []),
+        )
+        output_grids = metadata.get("support_expected_outputs", [])
+        query_grids = self._feature_grids(
+            self.context.task.query_x,
+            metadata.get("query_shapes", []),
+            metadata.get("query_offsets", []),
+        )
+        if not support_grids or len(support_grids) != len(output_grids) or not query_grids:
+            self.details.primitive_effects["support_nested_ring_reversal_mapping"] = 0.0
+            return
+
+        cell_total = 0
+        cell_correct = 0
+        exact_total = 0
+        exact_correct = 0
+        hdc_scores = []
+        for input_grid, expected_grid in zip(support_grids, output_grids):
+            predicted = self._reverse_nested_ring_colors(input_grid)
+            if self._grid_shape(predicted) != self._grid_shape(expected_grid):
+                self.details.primitive_effects["support_nested_ring_reversal_mapping"] = 0.0
+                return
+            exact_total += 1
+            exact_correct += 1 if predicted == expected_grid else 0
+            hdc_scores.append(grid_pair_similarity(predicted, expected_grid))
+            for pred_row, exp_row in zip(predicted, expected_grid):
+                for pred_color, exp_color in zip(pred_row, exp_row):
+                    cell_total += 1
+                    cell_correct += 1 if int(pred_color) == int(exp_color) else 0
+
+        predicted_query = [self._reverse_nested_ring_colors(grid) for grid in query_grids]
+        logits = self._logits_from_grids(predicted_query, self.context.task.query_x.device)
+        exact_accuracy = exact_correct / max(1, exact_total)
+        cell_accuracy = cell_correct / max(1, cell_total)
+        hdc_similarity = sum(hdc_scores) / max(1, len(hdc_scores))
+        self.details.prediction_override = logits
+        self.details.objective_signal += float(exact_accuracy + cell_accuracy + hdc_similarity)
+        self.details.primitive_effects["support_nested_ring_reversal_mapping"] = float(cell_accuracy)
+        self.details.primitive_effects["support_nested_ring_exact"] = float(exact_accuracy)
+        self.details.primitive_effects["support_nested_ring_hdc_similarity"] = float(hdc_similarity)
+        self.details.primitive_effects["support_nested_ring_hdc_dimension"] = float(HDC_DIMENSION)
+
+    def _op_support_translation_mapping(self, step: PrimitiveStep) -> None:
+        if getattr(self.context.task, "metadata", {}).get("target_type") != "classification":
+            self.details.primitive_effects["support_translation_mapping"] = 0.0
+            return
+
+        metadata = getattr(self.context.task, "metadata", {})
+        support_grids = self._feature_grids(
+            self.context.task.support_x,
+            metadata.get("support_shapes", []),
+            metadata.get("support_offsets", []),
+        )
+        output_grids = metadata.get("support_expected_outputs", [])
+        query_grids = self._feature_grids(
+            self.context.task.query_x,
+            metadata.get("query_shapes", []),
+            metadata.get("query_offsets", []),
+        )
+        if not support_grids or len(support_grids) != len(output_grids) or not query_grids:
+            self.details.primitive_effects["support_translation_mapping"] = 0.0
+            return
+
+        candidates = []
+        for mode in ("drop", "clamp"):
+            for dr in range(-4, 5):
+                for dc in range(-4, 5):
+                    cell_total = 0
+                    cell_correct = 0
+                    exact_total = 0
+                    exact_correct = 0
+                    for input_grid, expected_grid in zip(support_grids, output_grids):
+                        background = self._most_common_color(input_grid)
+                        predicted = self._translate_non_background(input_grid, dr, dc, background, mode=mode)
+                        if self._grid_shape(predicted) != self._grid_shape(expected_grid):
+                            continue
+                        exact_total += 1
+                        exact_correct += 1 if predicted == expected_grid else 0
+                        for pred_row, exp_row in zip(predicted, expected_grid):
+                            for pred_color, exp_color in zip(pred_row, exp_row):
+                                cell_total += 1
+                                cell_correct += 1 if int(pred_color) == int(exp_color) else 0
+                    if cell_total == 0:
+                        continue
+                    candidates.append((exact_correct / max(1, exact_total), cell_correct / cell_total, dr, dc, mode))
+
+        if not candidates:
+            self.details.primitive_effects["support_translation_mapping"] = 0.0
+            return
+
+        best_exact, best_cell = max(candidates, key=lambda item: item[:2])[:2]
+        tied = [item for item in candidates if item[0] == best_exact and item[1] == best_cell]
+        hdc_ranked = []
+        for exact_accuracy, cell_accuracy, dr, dc, mode in tied:
+            hdc_scores = []
+            for input_grid, expected_grid in zip(support_grids, output_grids):
+                background = self._most_common_color(input_grid)
+                predicted = self._translate_non_background(input_grid, dr, dc, background, mode=mode)
+                hdc_scores.append(grid_pair_similarity(predicted, expected_grid))
+            hdc_ranked.append((exact_accuracy, cell_accuracy, sum(hdc_scores) / max(1, len(hdc_scores)), dr, dc, mode))
+        exact_accuracy, cell_accuracy, hdc_similarity, dr, dc, mode = max(hdc_ranked, key=lambda item: item[:3])
+
+        predicted_query = [
+            self._translate_non_background(grid, dr, dc, self._most_common_color(grid), mode=mode)
+            for grid in query_grids
+        ]
+        logits = self._logits_from_grids(predicted_query, self.context.task.query_x.device)
+        self.details.prediction_override = logits
+        self.details.objective_signal += float(exact_accuracy + cell_accuracy + hdc_similarity)
+        self.details.primitive_effects["support_translation_mapping"] = float(cell_accuracy)
+        self.details.primitive_effects["support_translation_exact"] = float(exact_accuracy)
+        self.details.primitive_effects["support_translation_hdc_similarity"] = float(hdc_similarity)
+        self.details.primitive_effects["support_translation_hdc_dimension"] = float(HDC_DIMENSION)
+        self.details.primitive_effects["support_translation_dr"] = float(dr)
+        self.details.primitive_effects["support_translation_dc"] = float(dc)
+        self.details.primitive_effects[f"support_translation_mode:{mode}"] = 1.0
+
     def _support_lookup_mapping(self, mode: str) -> None:
         if getattr(self.context.task, "metadata", {}).get("target_type") != "classification":
             self.details.primitive_effects[f"support_lookup_{mode}"] = 0.0
@@ -591,6 +836,117 @@ class _ProgramState:
         self.details.prediction_override = logits
         self.details.objective_signal += float(sum(confidences) / max(1, len(confidences)))
         self.details.primitive_effects[f"support_lookup_{mode}"] = float(hits / max(1, len(predictions)))
+
+    @staticmethod
+    def _grid_shape(grid: Sequence[Sequence[int]]) -> Tuple[int, int]:
+        return len(grid), len(grid[0]) if grid else 0
+
+    @staticmethod
+    def _feature_grids(features: torch.Tensor, shapes: object, offsets: object) -> List[List[List[int]]]:
+        if not isinstance(shapes, Sequence) or not isinstance(offsets, Sequence):
+            return []
+        if len(offsets) != len(shapes) + 1:
+            return []
+        flat_features = features.detach().float().reshape(features.shape[0], -1)
+        if flat_features.shape[1] < 5:
+            return []
+        grids: List[List[List[int]]] = []
+        for index, shape in enumerate(shapes):
+            if not isinstance(shape, Sequence) or len(shape) != 2:
+                return []
+            start = int(offsets[index])
+            end = int(offsets[index + 1])
+            rows, cols = int(shape[0]), int(shape[1])
+            if start < 0 or end > flat_features.shape[0] or end - start != rows * cols:
+                return []
+            colors = [
+                int(max(0, min(9, round(float(value * 9.0)))))
+                for value in flat_features[start:end, 4].tolist()
+            ]
+            grids.append([colors[row * cols : (row + 1) * cols] for row in range(rows)])
+        return grids
+
+    @staticmethod
+    def _grid_transforms():
+        return {
+            "identity": lambda grid: [list(row) for row in grid],
+            "hflip": lambda grid: [list(reversed(row)) for row in grid],
+            "vflip": lambda grid: [list(row) for row in reversed(grid)],
+            "rot180": lambda grid: [list(reversed(row)) for row in reversed(grid)],
+            "transpose": lambda grid: [list(row) for row in zip(*grid)] if len(grid) == len(grid[0]) else [],
+            "rot90": lambda grid: [list(row) for row in zip(*reversed(grid))] if len(grid) == len(grid[0]) else [],
+            "rot270": lambda grid: [list(row) for row in reversed(list(zip(*grid)))] if len(grid) == len(grid[0]) else [],
+        }
+
+    @staticmethod
+    def _apply_color_mapping(grid: Sequence[Sequence[int]], mapping: Dict[int, int], default_color: int) -> List[List[int]]:
+        return [
+            [int(mapping.get(int(color), int(color) if 0 <= int(color) <= 9 else default_color)) for color in row]
+            for row in grid
+        ]
+
+    @staticmethod
+    def _reverse_nested_ring_colors(grid: Sequence[Sequence[int]]) -> List[List[int]]:
+        rows, cols = len(grid), len(grid[0]) if grid else 0
+        if rows == 0 or cols == 0:
+            return []
+        ring_votes: Dict[int, Dict[int, int]] = {}
+        for row_index, row in enumerate(grid):
+            for col_index, color in enumerate(row):
+                ring = min(row_index, col_index, rows - 1 - row_index, cols - 1 - col_index)
+                value = int(color)
+                ring_votes.setdefault(ring, {})
+                ring_votes[ring][value] = ring_votes[ring].get(value, 0) + 1
+        ring_ids = sorted(ring_votes)
+        ring_colors = [
+            max(ring_votes[ring].items(), key=lambda item: (item[1], -item[0]))[0]
+            for ring in ring_ids
+        ]
+        reversed_colors = list(reversed(ring_colors))
+        ring_map = {ring: reversed_colors[index] for index, ring in enumerate(ring_ids)}
+        return [
+            [
+                int(ring_map[min(row_index, col_index, rows - 1 - row_index, cols - 1 - col_index)])
+                for col_index in range(cols)
+            ]
+            for row_index in range(rows)
+        ]
+
+    @staticmethod
+    def _most_common_color(grid: Sequence[Sequence[int]]) -> int:
+        counts: Dict[int, int] = {}
+        for row in grid:
+            for color in row:
+                value = int(color)
+                counts[value] = counts.get(value, 0) + 1
+        if not counts:
+            return 0
+        return max(counts.items(), key=lambda item: (item[1], -item[0]))[0]
+
+    @staticmethod
+    def _translate_non_background(grid: Sequence[Sequence[int]], dr: int, dc: int, background: int, *, mode: str = "drop") -> List[List[int]]:
+        rows, cols = len(grid), len(grid[0]) if grid else 0
+        out = [[int(background) for _ in range(cols)] for _ in range(rows)]
+        for row_index, row in enumerate(grid):
+            for col_index, color in enumerate(row):
+                value = int(color)
+                if value == int(background):
+                    continue
+                nr, nc = row_index + int(dr), col_index + int(dc)
+                if mode == "clamp":
+                    nr = max(0, min(rows - 1, nr))
+                    nc = max(0, min(cols - 1, nc))
+                if 0 <= nr < rows and 0 <= nc < cols:
+                    out[nr][nc] = value
+        return out
+
+    @staticmethod
+    def _logits_from_grids(grids: Sequence[Sequence[Sequence[int]]], device: torch.device) -> torch.Tensor:
+        labels = [int(max(0, min(9, int(color)))) for grid in grids for row in grid for color in row]
+        logits = torch.full((len(labels), 10), -6.0, dtype=torch.float32, device=device)
+        for row_index, label in enumerate(labels):
+            logits[row_index, label] = 6.0
+        return logits
 
     def _op_constant_lr(self, step: PrimitiveStep) -> None:
         self.current_lr = _clamp(float(step.args.get("lr", self.base_lr)), 1e-5, 0.3)

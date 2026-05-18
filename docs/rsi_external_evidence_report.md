@@ -23,6 +23,7 @@ These results do not demonstrate AGI, quasi-AGI, human-level intelligence, open-
 ## ARC Benchmark Protocol
 
 Benchmark file: `benchmarks/arc_external_rsi_benchmark.py`
+HDC signature file: `arc_hdc_signature.py`
 
 Scope:
 
@@ -33,6 +34,9 @@ Scope:
 - Candidate acceptance uses validation and hidden validation only.
 - Final held-out test scoring is frozen after candidate decisions.
 - Per-task final selection uses leave-one-demonstration-out support cross-validation on public ARC training examples, not held-out test labels.
+- OMEGA-THDSE-inspired ARC additions use deterministic 10,000-dimensional FHRR-style phase signatures, support-only geometric/color transforms, a nested-ring topological rule, and support-only object translation with drop/clamp boundary modes.
+- Support-symbolic candidates may use a small hidden-cell tolerance only when validation gain is positive, exact-grid accuracy does not regress, deterministic replay passes, runtime behavior changes, and final deployment is still selected by support cross-validation.
+- Low-confidence support-translation programs receive a deployment penalty when leave-one-demonstration-out support accuracy is below `0.75` and exact support accuracy is zero.
 
 Commands:
 
@@ -48,7 +52,7 @@ python benchmarks/arc_external_rsi_benchmark.py --mode full --seed 43 --arc-data
 python benchmarks/arc_external_rsi_benchmark.py --mode full --seed 44 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_multiseed_full_seed44.json
 ```
 
-Multi-seed ARC results over seeds `42, 43, 44`:
+Earlier multi-seed ARC results over seeds `42, 43, 44` before the latest translation-guard rerun:
 
 | Mode | Baseline cell mean | Evolved cell mean | Cell delta mean | Cell delta stderr | Evolved exact mean | Exact delta mean |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -61,6 +65,43 @@ Interpretation:
 - Cell-level improvement is positive in all tested modes and seeds.
 - Exact-grid accuracy is nonzero on average in all modes, but remains low.
 - The result is not an official ARC score because it uses a disclosed public same-shape subset.
+
+## OMEGA-THDSE-Inspired HDC/Translation Rerun
+
+The local `OMEGA-THDSE` repository suggested a useful concrete mechanism, not a mystical "beyond human" step: high-dimensional FHRR phase signatures, bind/bundle composition, and topology-aware symbolic search. This repository uses those ideas only as bounded ARC program-selection machinery.
+
+Commands:
+
+```bash
+python benchmarks/arc_external_rsi_benchmark.py --mode quick --seed 42 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_hdc_ring_tolerant2_quick_seed42.json
+python benchmarks/arc_external_rsi_benchmark.py --mode quick --seed 43 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_hdc_ring_tolerant2_quick_seed43.json
+python benchmarks/arc_external_rsi_benchmark.py --mode quick --seed 44 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_hdc_ring_tolerant2_quick_seed44.json
+python benchmarks/arc_external_rsi_benchmark.py --mode full --seed 42 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_hdc_ring_tolerant2_full_seed42.json
+python benchmarks/arc_external_rsi_benchmark.py --mode quick --seed 42 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_hdc_translation_guarded_quick_seed42.json
+python benchmarks/arc_external_rsi_benchmark.py --mode full --seed 42 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_hdc_translation_guarded_full_seed42.json
+```
+
+Quick-mode comparison:
+
+| Seed | Baseline cell | Previous evolved cell | HDC/topological evolved cell | Latest guarded evolved cell | Previous exact | Latest exact |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `42` | `0.6445714286` | `0.7469795918` | `0.9347346939` | `0.9475510204` | `0.0` | `0.2` |
+| `43` | `0.4152525253` | `0.8515987144` | `0.8515987144` | not rerun | `0.2` | `0.2` |
+| `44` | `0.1410454545` | `0.8795987654` | `0.8795987654` | not rerun | `0.0` | `0.0` |
+| mean before translation guard | `0.4002898028` | `0.8260590239` | `0.8886440579` | not measured | `0.0666666667` | `0.1333333333` |
+
+Full-mode seed 42 spot-check:
+
+| Mode/seed | Baseline cell | Previous evolved cell | Latest guarded evolved cell | Latest cell delta | Exact delta |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| full/42 | `0.6680555556` | `0.7673611111` | `0.7827777778` | `+0.1147222222` | `0.0` |
+
+Interpretation:
+
+- The OMEGA-inspired path produced a real quick-mode improvement, mostly by solving a nested-ring ARC task that the prior DSL missed.
+- The later support-translation guard produced a verified full seed-42 cell-accuracy improvement over the previous HDC/topological full result.
+- Exact-grid accuracy still did not improve on the full seed-42 split.
+- This is bounded symbolic/topological program induction, not AGI, quasi-AGI, or open-ended self-improvement.
 
 ## HumanEval Coding Benchmark Protocol
 
@@ -108,11 +149,11 @@ python -m pytest -q
 Observed result:
 
 - Focused benchmark/operator tests passed.
-- Full suite passed: `162 passed`.
+- Full suite passed after the HDC/topological/translation ARC upgrade: `165 passed`.
 
 ## Remaining Work
 
-- Increase ARC exact-grid success in quick and full modes.
+- Increase ARC exact-grid success, especially in full mode.
 - Add a non-template coding synthesizer or LLM-backed coding generator if credentials and model policy permit.
 - Add more seeds and confidence intervals.
 - Evaluate on variable-shape ARC tasks.

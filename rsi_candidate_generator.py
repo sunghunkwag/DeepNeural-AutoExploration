@@ -138,6 +138,48 @@ class CandidateGenerator:
             out.append(
                 (
                     self._program(
+                        f"g{generation}_support_geometric_transform_mapping",
+                        (PrimitiveStep("support_geometric_transform_mapping"),),
+                        self._perturbed_params(best),
+                        best,
+                        generation,
+                    ),
+                    "hdc_geometric_rule_mutation",
+                    "use support-only geometric/color transform search with a 10000-dimensional FHRR tie-breaker",
+                    [best.program_id],
+                )
+            )
+            out.append(
+                (
+                    self._program(
+                        f"g{generation}_support_nested_ring_reversal_mapping",
+                        (PrimitiveStep("support_nested_ring_reversal_mapping"),),
+                        self._perturbed_params(best),
+                        best,
+                        generation,
+                    ),
+                    "hdc_topological_ring_rule_mutation",
+                    "reverse outer-to-inner nested ARC ring colors using support-only topology and 10000-dimensional HDC scoring",
+                    [best.program_id],
+                )
+            )
+            out.append(
+                (
+                    self._program(
+                        f"g{generation}_support_translation_mapping",
+                        (PrimitiveStep("support_translation_mapping"),),
+                        self._perturbed_params(best),
+                        best,
+                        generation,
+                    ),
+                    "hdc_translation_rule_mutation",
+                    "infer a support-only row/column translation of non-background ARC objects with 10000-dimensional HDC tie-breaking",
+                    [best.program_id],
+                )
+            )
+            out.append(
+                (
+                    self._program(
                         f"g{generation}_support_local_pattern_mapping",
                         (PrimitiveStep("support_local_pattern_mapping"),),
                         self._perturbed_params(best),
