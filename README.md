@@ -38,6 +38,10 @@ python -m pytest -q
 - `failure_grammar.py`: rejected-candidate rules reused in later generations.
 - `evaluator_evolution.py`: probationary evaluator mutation under adversarial checks.
 - `research_goal_controller.py`: benchmark-evidence to research-goal generation and meta-meta goal-policy search.
+- `neural_search/`: explicit architecture genomes, deterministic bounded mutations, weight inheritance, and validation-only neural candidate sandboxing.
+- `failure_residue/`: structured failure residue extraction with held-out leakage refusal and missing-module inference.
+- `world_model_v2/`: object-centric state, causal graph, intervention, counterfactual rollout, and uncertainty decomposition utilities.
+- `meta_rsi/`: higher-level bounded orchestration over residues, neural search candidates, registry updates, experiment plans, and audit reports.
 - `orchestrator_core/`: typed artifact routing and integration scaffold.
 - `interaction_*`: bounded interaction-residue simulation and evaluation tools.
 
@@ -129,6 +133,8 @@ pip install pytest
 - [External RSI evidence report](docs/rsi_external_evidence_report.md)
 - [Research-goal generation integration](docs/research_goal_generation_integration.md)
 - [Next architecture upgrade plan](docs/next_architecture_upgrade_plan.md)
+- [Deep neural autonomous exploration upgrade](docs/deep_neural_autonomous_exploration_upgrade.md)
+- [ARC seed-44 failure residue report](docs/arc_seed44_failure_residue_report.md)
 - [Interaction operating scaffold](docs/interaction_operating_scaffold.md)
 - [Interaction residue layer](docs/interaction_residue_layer.md)
 
