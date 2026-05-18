@@ -51,7 +51,7 @@ def test_residue_inferencer_maps_repeated_failures_to_module_family():
     hypotheses = MissingOperatorInferencer(min_support=2).infer(residues)
     assert len(hypotheses) == 1
     assert hypotheses[0].failure_type == "object-binding failure"
-    assert hypotheses[0].proposed_module_family == "object-centric binding module"
+    assert hypotheses[0].proposed_module_family == "object_binding_adapter"
     plan = residues_to_experiment_plan(residues, hypotheses, seed=5)
     assert plan["selection_split"] == "validation"
     assert plan["uses_heldout_labels"] is False

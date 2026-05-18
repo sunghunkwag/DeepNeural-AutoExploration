@@ -99,9 +99,11 @@ class MetaRSIOrchestrator:
 def _mutation_for_module_family(module_family: str, failure_type: str) -> str:
     lowered = f"{module_family} {failure_type}".lower()
     if "memory" in lowered or "object" in lowered or "binding" in lowered:
-        return "add_memory_gate"
+        return "object_binding_adapter" if "object" in lowered or "binding" in lowered else "add_memory_gate"
     if "causal" in lowered or "bottleneck" in lowered:
         return "add_causal_bottleneck"
+    if "sequence" in lowered or "state" in lowered:
+        return "sequence_state_adapter"
     if "width" in lowered or "architecture" in lowered or "neural" in lowered:
         return "widen_hidden_dim"
     if "evaluator" in lowered:

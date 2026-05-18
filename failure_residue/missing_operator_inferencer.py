@@ -9,6 +9,19 @@ from typing import Dict, List, Sequence
 from .residue_schema import FailureResidue
 
 
+_FAILURE_TO_MODULE = {
+    "object-binding failure": "object_binding_adapter",
+    "architecture-representation bottleneck": "wider_residual_stack",
+    "representation collapse": "wider_residual_stack",
+    "gradient bottleneck": "wider_residual_stack",
+    "causal intervention failure": "causal_bottleneck_block",
+    "sequence instability": "sequence_state_adapter",
+    "dead module": "gated_memory_block",
+    "over-compressed bottleneck": "causal_bottleneck_block",
+    "task-family entanglement": "object_binding_adapter",
+}
+
+
 @dataclass(frozen=True)
 class MissingRepresentationHypothesis:
     failure_type: str
@@ -34,7 +47,11 @@ class MissingOperatorInferencer:
     def infer(self, residues: Sequence[FailureResidue]) -> List[MissingRepresentationHypothesis]:
         grouped: Dict[tuple[str, str], List[FailureResidue]] = defaultdict(list)
         for residue in residues:
-            grouped[(residue.failure_type, residue.proposed_operator_or_module_family)].append(residue)
+            module_family = _FAILURE_TO_MODULE.get(
+                residue.failure_type,
+                residue.proposed_operator_or_module_family,
+            )
+            grouped[(residue.failure_type, module_family)].append(residue)
 
         hypotheses: List[MissingRepresentationHypothesis] = []
         for (failure_type, module_family), group in grouped.items():

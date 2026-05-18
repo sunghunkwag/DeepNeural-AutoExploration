@@ -29,6 +29,8 @@ class ArchitectureGenome:
     residual_blocks: int = 1
     memory_gates: int = 0
     causal_bottlenecks: int = 0
+    object_binding_adapters: int = 0
+    sequence_state_adapters: int = 0
     bottleneck_dim: Optional[int] = None
     activation: str = "tanh"
     dropout: float = 0.0
@@ -48,6 +50,10 @@ class ArchitectureGenome:
             raise ValueError("memory_gates cannot be negative")
         if self.causal_bottlenecks < 0:
             raise ValueError("causal_bottlenecks cannot be negative")
+        if self.object_binding_adapters < 0:
+            raise ValueError("object_binding_adapters cannot be negative")
+        if self.sequence_state_adapters < 0:
+            raise ValueError("sequence_state_adapters cannot be negative")
         if not 0.0 <= float(self.dropout) < 1.0:
             raise ValueError("dropout must be in [0, 1)")
         if self.bottleneck_dim is not None and self.bottleneck_dim <= 0:

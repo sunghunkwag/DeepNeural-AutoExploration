@@ -15,6 +15,10 @@ MUTATION_METHODS = (
     "narrow_hidden_dim",
     "add_memory_gate",
     "add_causal_bottleneck",
+    "object_binding_adapter",
+    "sequence_state_adapter",
+    "wider_residual_stack",
+    "repair_bottleneck",
 )
 
 
@@ -42,6 +46,16 @@ def mutate_architecture(parent: ArchitectureGenome, method: str, seed: int) -> A
     elif method == "add_causal_bottleneck":
         updates["causal_bottlenecks"] = parent.causal_bottlenecks + 1
         updates["bottleneck_dim"] = max(1, min(parent.effective_bottleneck_dim, parent.hidden_dim // 2))
+    elif method == "object_binding_adapter":
+        updates["object_binding_adapters"] = parent.object_binding_adapters + 1
+    elif method == "sequence_state_adapter":
+        updates["sequence_state_adapters"] = parent.sequence_state_adapters + 1
+    elif method == "wider_residual_stack":
+        updates["residual_blocks"] = parent.residual_blocks + 2
+        updates["hidden_dim"] = parent.hidden_dim + _width_step(parent.hidden_dim, rng)
+    elif method == "repair_bottleneck":
+        updates["causal_bottlenecks"] = parent.causal_bottlenecks + 1
+        updates["bottleneck_dim"] = max(2, min(parent.hidden_dim, parent.effective_bottleneck_dim * 2))
     return parent.with_updates(**updates)
 
 
