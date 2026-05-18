@@ -396,6 +396,79 @@ def test_arc_exact_repair_solves_move_objects_up_by_height():
     assert any(key.startswith("support_exact_repair_method:move_objects_up_by_height") for key in details.primitive_effects)
 
 
+def test_arc_exact_repair_solves_oriented_gap_extrapolation_fill():
+    def hflip(grid):
+        return [list(reversed(row)) for row in grid]
+
+    def transpose(grid):
+        return [list(row) for row in zip(*grid)]
+
+    right_input_a = [
+        [0, 1, 1, 1, 0, 0],
+        [0, 1, 0, 1, 0, 0],
+        [0, 1, 0, 0, 0, 0],
+        [0, 1, 0, 1, 0, 0],
+        [0, 1, 1, 1, 0, 0],
+    ]
+    right_output_a = [
+        [0, 1, 1, 1, 0, 4],
+        [0, 1, 4, 1, 4, 0],
+        [0, 1, 4, 4, 4, 4],
+        [0, 1, 4, 1, 4, 0],
+        [0, 1, 1, 1, 0, 4],
+    ]
+    right_input_b = [
+        [0, 8, 8, 8, 8, 0, 0],
+        [0, 8, 0, 0, 8, 0, 0],
+        [0, 8, 0, 0, 0, 0, 0],
+        [0, 8, 0, 0, 0, 0, 0],
+        [0, 8, 0, 0, 8, 0, 0],
+        [0, 8, 8, 8, 8, 0, 0],
+    ]
+    right_output_b = [
+        [0, 8, 8, 8, 8, 0, 4],
+        [0, 8, 4, 4, 8, 4, 0],
+        [0, 8, 4, 4, 4, 4, 4],
+        [0, 8, 4, 4, 4, 4, 4],
+        [0, 8, 4, 4, 8, 4, 0],
+        [0, 8, 8, 8, 8, 0, 4],
+    ]
+    right_test = [
+        [0, 2, 2, 2, 0, 0],
+        [0, 2, 0, 2, 0, 0],
+        [0, 2, 0, 0, 0, 0],
+        [0, 2, 0, 2, 0, 0],
+        [0, 2, 2, 2, 0, 0],
+    ]
+    right_expected = [
+        [0, 2, 2, 2, 0, 4],
+        [0, 2, 4, 2, 4, 0],
+        [0, 2, 4, 4, 4, 4],
+        [0, 2, 4, 2, 4, 0],
+        [0, 2, 2, 2, 0, 4],
+    ]
+
+    variants = [
+        ("right", lambda grid: grid),
+        ("left", hflip),
+        ("down", transpose),
+        ("up", lambda grid: transpose(hflip(grid))),
+    ]
+    for _, transform in variants:
+        payload = {
+            "train": [
+                {"input": transform(right_input_a), "output": transform(right_output_a)},
+                {"input": transform(right_input_b), "output": transform(right_output_b)},
+            ],
+            "test": [{"input": transform(right_test), "output": transform(right_expected)}],
+        }
+        details = _run_support_exact_repair(payload)
+        assert any(
+            key.startswith("support_exact_repair_method:oriented_gap_extrapolation_fill")
+            for key in details.primitive_effects
+        )
+
+
 def test_arc_external_rsi_smoke_reports_baseline_to_evolved(tmp_path, monkeypatch):
     root = _write_arc_fixture(tmp_path / "arc", count=8)
 

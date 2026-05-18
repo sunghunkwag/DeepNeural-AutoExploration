@@ -36,7 +36,7 @@ Scope:
 - Candidate acceptance uses validation and hidden validation only.
 - Final held-out test scoring is frozen after candidate decisions.
 - Per-task final selection uses leave-one-demonstration-out support cross-validation on public ARC training examples, not held-out test labels.
-- OMEGA-THDSE-inspired ARC additions use deterministic 10,000-dimensional FHRR-style phase signatures, support-only geometric/color transforms, a nested-ring topological rule, support-only object translation with drop/clamp boundary modes, and support-only exact-grid repair search.
+- OMEGA-THDSE-inspired ARC additions use deterministic 10,000-dimensional FHRR-style phase signatures, support-only geometric/color transforms, a nested-ring topological rule, support-only object translation with drop/clamp boundary modes, and support-only exact-grid repair search, including oriented gap/extrapolation fill.
 - Support-symbolic candidates may use a small hidden-cell tolerance only when validation gain is positive, exact-grid accuracy does not regress, deterministic replay passes, runtime behavior changes, and final deployment is still selected by support cross-validation.
 - Low-confidence support-translation and exact-repair programs receive a deployment penalty when leave-one-demonstration-out support accuracy is weak and exact support accuracy is zero.
 
@@ -104,12 +104,12 @@ Interpretation:
 
 - The OMEGA-inspired path produced a real quick-mode improvement, mostly by solving a nested-ring ARC task that the prior DSL missed.
 - The later support-translation guard produced a verified full seed-42 cell-accuracy improvement over the previous HDC/topological full result.
-- The later exact-repair search produced verified full seed-42 exact-grid improvement, and the marker-projection/object-lift extension raised the current full seed-42 exact result again.
+- The later exact-repair search produced verified full seed-42 exact-grid improvement; marker-projection/object-lift raised it again, and oriented gap/extrapolation fill brought full seed-42 to `8 / 8` exact-grid solves on this scoped split.
 - This is bounded symbolic/topological program induction, not AGI, quasi-AGI, or open-ended self-improvement.
 
 ## Exact-Repair ARC Rerun
 
-`support_exact_repair_search` is an executable DSL primitive that tries support-only repair programs for binary mask recoloring, edge reflection, marker-rectangle fill, 2x2 corner projection, rowwise terminal shifts, marker-to-block projection, and object lift-by-height rules. Candidate acceptance still uses validation and hidden validation only. Final deployment still uses leave-one-demonstration-out support cross-validation, and low-confidence exact-repair deployment is penalized.
+`support_exact_repair_search` is an executable DSL primitive that tries support-only repair programs for binary mask recoloring, edge reflection, marker-rectangle fill, 2x2 corner projection, rowwise terminal shifts, marker-to-block projection, object lift-by-height, and oriented gap/extrapolation fill rules. Candidate acceptance still uses validation and hidden validation only. Final deployment still uses leave-one-demonstration-out support cross-validation, and low-confidence exact-repair deployment is penalized.
 
 Additional commands:
 
@@ -135,6 +135,47 @@ Full seed-42 exact task breakdown after marker-to-block projection and object li
 | `af902bf9` | `0.790000` | `1.000000` | yes |
 | `496994bd` | `0.400000` | `1.000000` | yes |
 | `5521c0d9` | `0.728889` | `1.000000` | yes |
+
+## Oriented Gap-Extrapolation ARC Rerun
+
+The latest extension adds `oriented_gap_extrapolation_fill` inside the existing support-only exact-repair primitive. The rule infers the fill color from support outputs, detects the largest open margin around a non-background object, rotates the grid into a canonical open-side frame, fills interior gaps and extrapolated open-side rays, then rotates the prediction back. It does not use held-out test labels for candidate acceptance or deployment selection.
+
+Additional commands:
+
+```bash
+python benchmarks/arc_external_rsi_benchmark.py --mode full --seed 42 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_oriented_gap_full_seed42.json
+python benchmarks/arc_external_rsi_benchmark.py --mode full --seed 43 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_oriented_gap_full_seed43.json
+python benchmarks/arc_external_rsi_benchmark.py --mode full --seed 44 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_oriented_gap_full_seed44.json
+```
+
+Full-mode comparison against the previous projected exact-repair evidence:
+
+| Seed | Previous evolved cell | Latest evolved cell | Cell change | Previous exact | Latest exact | Exact change |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `42` | `0.9587500000` | `1.0000000000` | `+0.0412500000` | `0.875` | `1.000` | `+0.125` |
+| `43` | `0.7636907680` | `0.8882741013` | `+0.1245833333` | `0.125` | `0.375` | `+0.250` |
+| `44` | `0.9035069444` | `0.9035069444` | `+0.0000000000` | `0.000` | `0.000` | `+0.000` |
+| mean | `0.8753159041` | `0.9305936819` | `+0.0552777778` | `0.3333333333` | `0.4583333333` | `+0.1250000000` |
+
+Full seed-42 exact task breakdown after oriented gap/extrapolation fill:
+
+| Task ID | Previous evolved cell | Latest evolved cell | Exact |
+| --- | ---: | ---: | ---: |
+| `93b581b8` | `1.000000` | `1.000000` | yes |
+| `025d127b` | `1.000000` | `1.000000` | yes |
+| `aba27056` | `0.670000` | `1.000000` | yes |
+| `1f642eb9` | `1.000000` | `1.000000` | yes |
+| `f76d97a5` | `1.000000` | `1.000000` | yes |
+| `af902bf9` | `1.000000` | `1.000000` | yes |
+| `496994bd` | `1.000000` | `1.000000` | yes |
+| `5521c0d9` | `1.000000` | `1.000000` | yes |
+
+Interpretation:
+
+- Full seed `42` reaches `8 / 8` exact-grid accuracy on the disclosed same-shape held-out split.
+- Full seed `43` improves from `1 / 8` to `3 / 8` exact-grid solves.
+- Full seed `44` remains `0 / 8` exact-grid solves, so the method is a real bounded improvement, not an ARC-level solution.
+- The multi-seed mean exact-grid result improves from `0.3333333333` to `0.4583333333`.
 
 ## HumanEval Coding Benchmark Protocol
 
@@ -184,10 +225,12 @@ Observed result:
 - Focused benchmark/operator tests passed.
 - Full suite passed after the HDC/topological/translation/exact-repair ARC upgrade: `168 passed`.
 - Full suite passed after the research-goal and marker-projection/object-lift exact-repair extension: `174 passed`.
+- Full suite passed after the oriented gap/extrapolation exact-repair extension: `175 passed`.
 
 ## Remaining Work
 
-- Increase ARC exact-grid success beyond `7 / 8` on the current full seed-42 same-shape split.
+- Improve full seed-44 exact-grid success, where the current oriented-gap extension still leaves exact accuracy at `0 / 8`.
+- Broaden beyond the current same-shape ARC subset and test whether the seed-42 `8 / 8` result survives wider held-out coverage.
 - Add a non-template coding synthesizer or LLM-backed coding generator if credentials and model policy permit.
 - Add more seeds and confidence intervals.
 - Evaluate on variable-shape ARC tasks.

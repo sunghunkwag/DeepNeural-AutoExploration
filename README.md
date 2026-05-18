@@ -10,9 +10,11 @@ The strongest current external result is on the public ARC-AGI-1 same-shape subs
 
 | Benchmark | Mode/seed | Baseline | Evolved | Delta |
 | --- | --- | ---: | ---: | ---: |
-| ARC cell accuracy | full/42 | `0.6680555556` | `0.9587500000` | `+0.2906944444` |
-| ARC exact-grid accuracy | full/42 | `0.0` | `0.875` | `+0.875` |
+| ARC cell accuracy | full/42 | `0.6680555556` | `1.0000000000` | `+0.3319444444` |
+| ARC exact-grid accuracy | full/42 | `0.0` | `1.000` | `+1.000` |
 | ARC exact-grid accuracy | quick/42 | `0.0` | `0.4` | `+0.4` |
+
+Across full seeds `42, 43, 44`, the latest oriented-gap exact-repair extension raises mean held-out cell accuracy from the previous `0.8753159041` to `0.9305936819` and mean exact-grid accuracy from `0.3333333333` to `0.4583333333`. Seed `44` still has `0.0` exact-grid accuracy, so this is a bounded benchmark gain, not a solved ARC system.
 
 The HumanEval adapter is a template-based harness check, not a general code-generation result. See [docs/rsi_external_evidence_report.md](docs/rsi_external_evidence_report.md) for protocol details, limitations, and commands.
 
@@ -20,7 +22,7 @@ Current full regression check:
 
 ```bash
 python -m pytest -q
-# 174 passed
+# 175 passed
 ```
 
 ## Main Components

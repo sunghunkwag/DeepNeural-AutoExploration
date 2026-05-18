@@ -950,6 +950,12 @@ class _ProgramState:
                 lambda grid, block_color=block_color: self._project_markers_to_block(grid, block_color),
             )
 
+        for fill_color in fill_colors:
+            add_candidate(
+                f"oriented_gap_extrapolation_fill:{fill_color}",
+                lambda grid, fill_color=fill_color: self._oriented_gap_extrapolation_fill(grid, fill_color),
+            )
+
         add_candidate("move_objects_up_by_height", self._move_objects_up_by_height)
 
         return candidates
@@ -1272,9 +1278,108 @@ class _ProgramState:
                     out[target_row][col_index] = int(color)
         return out
 
+    def _oriented_gap_extrapolation_fill(self, grid: Sequence[Sequence[int]], fill_color: int) -> List[List[int]]:
+        rows, cols = self._grid_shape(grid)
+        if rows == 0 or cols == 0:
+            return []
+        background = self._background_color(grid)
+        box = self._non_background_bbox(grid, background)
+        if box is None:
+            return [list(map(int, row)) for row in grid]
+        top, bottom, left, right = box
+        margins = {
+            "up": top,
+            "down": rows - 1 - bottom,
+            "left": left,
+            "right": cols - 1 - right,
+        }
+        direction_order = {"right": 0, "down": 1, "left": 2, "up": 3}
+        direction = max(margins, key=lambda item: (margins[item], -direction_order[item]))
+
+        if direction == "right":
+            return self._right_gap_extrapolation_fill(grid, fill_color)
+        if direction == "left":
+            flipped = self._horizontal_flip_grid(grid)
+            return self._horizontal_flip_grid(self._right_gap_extrapolation_fill(flipped, fill_color))
+        if direction == "down":
+            transposed = self._transpose_grid(grid)
+            return self._transpose_grid(self._right_gap_extrapolation_fill(transposed, fill_color))
+
+        canonical = self._horizontal_flip_grid(self._transpose_grid(grid))
+        filled = self._right_gap_extrapolation_fill(canonical, fill_color)
+        return self._transpose_grid(self._horizontal_flip_grid(filled))
+
+    def _right_gap_extrapolation_fill(self, grid: Sequence[Sequence[int]], fill_color: int) -> List[List[int]]:
+        rows, cols = self._grid_shape(grid)
+        if rows == 0 or cols == 0:
+            return []
+        background = self._background_color(grid)
+        box = self._non_background_bbox(grid, background)
+        if box is None:
+            return [list(map(int, row)) for row in grid]
+        top, bottom, _, _ = box
+        out = [list(map(int, row)) for row in grid]
+
+        for row_index, row in enumerate(grid):
+            object_cols = [col_index for col_index, color in enumerate(row) if int(color) != int(background)]
+            fill_cols: List[int] = []
+            if object_cols:
+                left = min(object_cols)
+                right = max(object_cols)
+                solid_run = len(object_cols) == right - left + 1
+                if len(object_cols) == 1:
+                    fill_cols = list(range(right + 1, cols))
+                elif solid_run:
+                    fill_cols = [right + 2]
+                else:
+                    fill_cols = [
+                        col_index
+                        for col_index in range(left + 1, right)
+                        if int(row[col_index]) == int(background)
+                    ]
+                    fill_cols.append(right + 1)
+            elif row_index < top:
+                cap_cols = [col_index for col_index, color in enumerate(grid[top]) if int(color) != int(background)]
+                if cap_cols:
+                    fill_cols = [max(cap_cols) + (top - row_index) + 2]
+            elif row_index > bottom:
+                cap_cols = [col_index for col_index, color in enumerate(grid[bottom]) if int(color) != int(background)]
+                if cap_cols:
+                    fill_cols = [max(cap_cols) + (row_index - bottom) + 2]
+
+            for col_index in fill_cols:
+                if 0 <= col_index < cols and int(out[row_index][col_index]) == int(background):
+                    out[row_index][col_index] = int(fill_color)
+        return out
+
     @staticmethod
     def _grid_shape(grid: Sequence[Sequence[int]]) -> Tuple[int, int]:
         return len(grid), len(grid[0]) if grid else 0
+
+    @staticmethod
+    def _transpose_grid(grid: Sequence[Sequence[int]]) -> List[List[int]]:
+        return [list(map(int, row)) for row in zip(*grid)] if grid else []
+
+    @staticmethod
+    def _horizontal_flip_grid(grid: Sequence[Sequence[int]]) -> List[List[int]]:
+        return [list(reversed([int(color) for color in row])) for row in grid]
+
+    @staticmethod
+    def _non_background_bbox(grid: Sequence[Sequence[int]], background: int) -> Optional[Tuple[int, int, int, int]]:
+        cells = [
+            (row_index, col_index)
+            for row_index, row in enumerate(grid)
+            for col_index, color in enumerate(row)
+            if int(color) != int(background)
+        ]
+        if not cells:
+            return None
+        return (
+            min(row for row, _ in cells),
+            max(row for row, _ in cells),
+            min(col for _, col in cells),
+            max(col for _, col in cells),
+        )
 
     @staticmethod
     def _feature_grids(features: torch.Tensor, shapes: object, offsets: object) -> List[List[List[int]]]:
