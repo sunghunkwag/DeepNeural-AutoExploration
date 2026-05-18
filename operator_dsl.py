@@ -16,7 +16,7 @@ import hashlib
 import json
 import math
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -61,6 +61,7 @@ OBJECTIVE_PRIMITIVES = (
     "support_geometric_transform_mapping",
     "support_nested_ring_reversal_mapping",
     "support_translation_mapping",
+    "support_exact_repair_search",
 )
 SCHEDULE_PRIMITIVES = (
     "constant_lr",
@@ -776,6 +777,57 @@ class _ProgramState:
         self.details.primitive_effects["support_translation_dc"] = float(dc)
         self.details.primitive_effects[f"support_translation_mode:{mode}"] = 1.0
 
+    def _op_support_exact_repair_search(self, step: PrimitiveStep) -> None:
+        if getattr(self.context.task, "metadata", {}).get("target_type") != "classification":
+            self.details.primitive_effects["support_exact_repair_search"] = 0.0
+            return
+
+        metadata = getattr(self.context.task, "metadata", {})
+        support_grids = self._feature_grids(
+            self.context.task.support_x,
+            metadata.get("support_shapes", []),
+            metadata.get("support_offsets", []),
+        )
+        output_grids = metadata.get("support_expected_outputs", [])
+        query_grids = self._feature_grids(
+            self.context.task.query_x,
+            metadata.get("query_shapes", []),
+            metadata.get("query_offsets", []),
+        )
+        if not support_grids or len(support_grids) != len(output_grids) or not query_grids:
+            self.details.primitive_effects["support_exact_repair_search"] = 0.0
+            return
+
+        candidates = self._exact_repair_candidates(support_grids, output_grids, query_grids)
+        if not candidates:
+            self.details.primitive_effects["support_exact_repair_search"] = 0.0
+            return
+
+        scored = []
+        for name, support_predicted, query_predicted in candidates:
+            exact_accuracy, cell_accuracy = self._grid_prediction_scores(support_predicted, output_grids)
+            scored.append((exact_accuracy, cell_accuracy, name, support_predicted, query_predicted))
+
+        best_exact, best_cell = max(scored, key=lambda item: item[:2])[:2]
+        tied = [item for item in scored if item[0] == best_exact and item[1] == best_cell]
+        ranked = []
+        for exact_accuracy, cell_accuracy, name, support_predicted, query_predicted in tied:
+            hdc_similarity = sum(
+                grid_pair_similarity(predicted, expected)
+                for predicted, expected in zip(support_predicted, output_grids)
+            ) / max(1, len(output_grids))
+            ranked.append((exact_accuracy, cell_accuracy, hdc_similarity, name, query_predicted))
+
+        exact_accuracy, cell_accuracy, hdc_similarity, name, predicted_query = max(ranked, key=lambda item: item[:4])
+        logits = self._logits_from_grids(predicted_query, self.context.task.query_x.device)
+        self.details.prediction_override = logits
+        self.details.objective_signal += float(2.0 * exact_accuracy + cell_accuracy + hdc_similarity)
+        self.details.primitive_effects["support_exact_repair_search"] = float(cell_accuracy)
+        self.details.primitive_effects["support_exact_repair_exact"] = float(exact_accuracy)
+        self.details.primitive_effects["support_exact_repair_hdc_similarity"] = float(hdc_similarity)
+        self.details.primitive_effects["support_exact_repair_hdc_dimension"] = float(HDC_DIMENSION)
+        self.details.primitive_effects[f"support_exact_repair_method:{name}"] = 1.0
+
     def _support_lookup_mapping(self, mode: str) -> None:
         if getattr(self.context.task, "metadata", {}).get("target_type") != "classification":
             self.details.primitive_effects[f"support_lookup_{mode}"] = 0.0
@@ -836,6 +888,303 @@ class _ProgramState:
         self.details.prediction_override = logits
         self.details.objective_signal += float(sum(confidences) / max(1, len(confidences)))
         self.details.primitive_effects[f"support_lookup_{mode}"] = float(hits / max(1, len(predictions)))
+
+    def _exact_repair_candidates(
+        self,
+        support_grids: Sequence[Sequence[Sequence[int]]],
+        output_grids: Sequence[Sequence[Sequence[int]]],
+        query_grids: Sequence[Sequence[Sequence[int]]],
+    ) -> List[Tuple[str, List[List[List[int]]], List[List[List[int]]]]]:
+        candidates: List[Tuple[str, List[List[List[int]]], List[List[List[int]]]]] = []
+
+        def add_candidate(name: str, fn: Callable[[Sequence[Sequence[int]]], List[List[int]]]) -> None:
+            support_predicted = [fn(grid) for grid in support_grids]
+            query_predicted = [fn(grid) for grid in query_grids]
+            if all(self._grid_shape(predicted) == self._grid_shape(expected) for predicted, expected in zip(support_predicted, output_grids)):
+                candidates.append((name, support_predicted, query_predicted))
+
+        output_background = self._background_color_in_grids(output_grids)
+
+        for keep_color in range(10):
+            for replacement_name, replacement_fn in self._binary_replacement_policies(keep_color, output_grids):
+                add_candidate(
+                    f"binary_mask:{keep_color}:{replacement_name}",
+                    lambda grid, keep_color=keep_color, replacement_fn=replacement_fn: self._binary_mask_recolor(
+                        grid,
+                        keep_color,
+                        replacement_fn(grid),
+                        output_background,
+                    ),
+                )
+
+        for mode in ("top_to_bottom", "bottom_to_top", "left_to_right", "right_to_left"):
+            add_candidate(f"edge_reflection:{mode}", lambda grid, mode=mode: self._edge_reflection_copy(grid, mode))
+
+        marker_colors = sorted({int(color) for grid in support_grids for row in grid for color in row if int(color) != 0})
+        fill_colors = self._support_added_colors(support_grids, output_grids, output_background)
+        if not fill_colors:
+            fill_colors = sorted({int(color) for grid in output_grids for row in grid for color in row if int(color) != output_background})
+        for marker_color in marker_colors:
+            for fill_color in fill_colors:
+                if marker_color == fill_color:
+                    continue
+                add_candidate(
+                    f"marker_rectangle_fill:{marker_color}:{fill_color}",
+                    lambda grid, marker_color=marker_color, fill_color=fill_color: self._marker_rectangle_fill(grid, marker_color, fill_color),
+                )
+
+        add_candidate("corner_projection_2x2", self._corner_projection_2x2)
+
+        for mode in ("drop", "clamp"):
+            for dc in range(-4, 5):
+                if dc == 0:
+                    continue
+                add_candidate(
+                    f"rowwise_terminal_shift:{dc}:{mode}",
+                    lambda grid, dc=dc, mode=mode: self._rowwise_terminal_shift(grid, dc, mode),
+                )
+
+        return candidates
+
+    @staticmethod
+    def _grid_prediction_scores(
+        predicted_grids: Sequence[Sequence[Sequence[int]]],
+        expected_grids: Sequence[Sequence[Sequence[int]]],
+    ) -> Tuple[float, float]:
+        exact_total = 0
+        exact_correct = 0
+        cell_total = 0
+        cell_correct = 0
+        for predicted, expected in zip(predicted_grids, expected_grids):
+            exact_total += 1
+            exact_correct += 1 if predicted == expected else 0
+            for pred_row, exp_row in zip(predicted, expected):
+                for pred_color, exp_color in zip(pred_row, exp_row):
+                    cell_total += 1
+                    cell_correct += 1 if int(pred_color) == int(exp_color) else 0
+        return exact_correct / max(1, exact_total), cell_correct / max(1, cell_total)
+
+    @staticmethod
+    def _most_common_color_in_grids(grids: Sequence[Sequence[Sequence[int]]]) -> int:
+        counts: Dict[int, int] = {}
+        for grid in grids:
+            for row in grid:
+                for color in row:
+                    value = int(color)
+                    counts[value] = counts.get(value, 0) + 1
+        if not counts:
+            return 0
+        return max(counts.items(), key=lambda item: (item[1], -item[0]))[0]
+
+    @classmethod
+    def _background_color_in_grids(cls, grids: Sequence[Sequence[Sequence[int]]]) -> int:
+        if any(int(color) == 0 for grid in grids for row in grid for color in row):
+            return 0
+        return cls._most_common_color_in_grids(grids)
+
+    @classmethod
+    def _support_added_colors(
+        cls,
+        support_grids: Sequence[Sequence[Sequence[int]]],
+        output_grids: Sequence[Sequence[Sequence[int]]],
+        output_background: int,
+    ) -> List[int]:
+        added = set()
+        for input_grid, expected_grid in zip(support_grids, output_grids):
+            input_background = cls._background_color(input_grid)
+            for input_row, expected_row in zip(input_grid, expected_grid):
+                for input_color, expected_color in zip(input_row, expected_row):
+                    if int(input_color) == int(input_background) and int(expected_color) != int(output_background):
+                        added.add(int(expected_color))
+        return sorted(added)
+
+    def _binary_replacement_policies(
+        self,
+        keep_color: int,
+        output_grids: Sequence[Sequence[Sequence[int]]],
+    ) -> List[Tuple[str, Callable[[Sequence[Sequence[int]]], int]]]:
+        policies: List[Tuple[str, Callable[[Sequence[Sequence[int]]], int]]] = []
+        output_colors = sorted({int(color) for grid in output_grids for row in grid for color in row})
+        for color in output_colors:
+            policies.append((f"constant_{color}", lambda grid, color=color: int(color)))
+        policies.append((f"other_positive_than_{keep_color}", lambda grid, keep_color=keep_color: self._other_positive_color(grid, keep_color)))
+        policies.append((f"least_positive_than_{keep_color}", lambda grid, keep_color=keep_color: self._ranked_positive_color(grid, keep_color, least=True)))
+        policies.append((f"most_positive_than_{keep_color}", lambda grid, keep_color=keep_color: self._ranked_positive_color(grid, keep_color, least=False)))
+        return policies
+
+    @staticmethod
+    def _positive_color_counts(grid: Sequence[Sequence[int]]) -> Dict[int, int]:
+        counts: Dict[int, int] = {}
+        for row in grid:
+            for color in row:
+                value = int(color)
+                if value > 0:
+                    counts[value] = counts.get(value, 0) + 1
+        return counts
+
+    def _other_positive_color(self, grid: Sequence[Sequence[int]], keep_color: int) -> int:
+        counts = self._positive_color_counts(grid)
+        others = {color: count for color, count in counts.items() if color != int(keep_color)}
+        if not others:
+            return int(keep_color)
+        return max(others.items(), key=lambda item: (item[1], -item[0]))[0]
+
+    def _ranked_positive_color(self, grid: Sequence[Sequence[int]], keep_color: int, *, least: bool) -> int:
+        counts = self._positive_color_counts(grid)
+        others = {color: count for color, count in counts.items() if color != int(keep_color)}
+        if not others:
+            return int(keep_color)
+        key = (lambda item: (item[1], -item[0])) if not least else (lambda item: (-item[1], -item[0]))
+        return max(others.items(), key=key)[0]
+
+    @staticmethod
+    def _binary_mask_recolor(grid: Sequence[Sequence[int]], keep_color: int, replacement_color: int, background: int) -> List[List[int]]:
+        return [
+            [int(replacement_color) if int(color) == int(keep_color) else int(background) for color in row]
+            for row in grid
+        ]
+
+    def _edge_reflection_copy(self, grid: Sequence[Sequence[int]], mode: str) -> List[List[int]]:
+        rows, cols = self._grid_shape(grid)
+        if rows == 0 or cols == 0:
+            return []
+        background = self._background_color(grid)
+        out = [list(map(int, row)) for row in grid]
+
+        if mode in {"top_to_bottom", "bottom_to_top"}:
+            row_indices = range(rows) if mode == "top_to_bottom" else range(rows - 1, -1, -1)
+            band: List[List[int]] = []
+            for row_index in row_indices:
+                row = [int(color) for color in grid[row_index]]
+                if all(color == background for color in row):
+                    break
+                band.append(row)
+            if not band or len(band) >= rows:
+                return out
+            target_rows = range(rows - len(band), rows) if mode == "top_to_bottom" else range(len(band) - 1, -1, -1)
+            for target_row, source_row in zip(target_rows, reversed(band)):
+                out[target_row] = list(source_row)
+            return out
+
+        col_indices = range(cols) if mode == "left_to_right" else range(cols - 1, -1, -1)
+        band_cols: List[List[int]] = []
+        for col_index in col_indices:
+            col = [int(grid[row_index][col_index]) for row_index in range(rows)]
+            if all(color == background for color in col):
+                break
+            band_cols.append(col)
+        if not band_cols or len(band_cols) >= cols:
+            return out
+        target_cols = range(cols - len(band_cols), cols) if mode == "left_to_right" else range(len(band_cols) - 1, -1, -1)
+        for target_col, source_col in zip(target_cols, reversed(band_cols)):
+            for row_index, color in enumerate(source_col):
+                out[row_index][target_col] = int(color)
+        return out
+
+    def _marker_rectangle_fill(self, grid: Sequence[Sequence[int]], marker_color: int, fill_color: int) -> List[List[int]]:
+        rows, cols = self._grid_shape(grid)
+        if rows == 0 or cols == 0:
+            return []
+        background = self._background_color(grid)
+        out = [list(map(int, row)) for row in grid]
+        row_to_cols: Dict[int, set[int]] = {}
+        for row_index, row in enumerate(grid):
+            cols_with_marker = {col_index for col_index, color in enumerate(row) if int(color) == int(marker_color)}
+            if len(cols_with_marker) >= 2:
+                row_to_cols[row_index] = cols_with_marker
+        row_indices = sorted(row_to_cols)
+        for top_index, top in enumerate(row_indices):
+            for bottom in row_indices[top_index + 1 :]:
+                if bottom - top < 2:
+                    continue
+                common_cols = sorted(row_to_cols[top] & row_to_cols[bottom])
+                for left_index, left in enumerate(common_cols):
+                    for right in common_cols[left_index + 1 :]:
+                        if right - left < 2:
+                            continue
+                        for row_index in range(top + 1, bottom):
+                            for col_index in range(left + 1, right):
+                                if int(out[row_index][col_index]) == int(background):
+                                    out[row_index][col_index] = int(fill_color)
+        return out
+
+    def _corner_projection_2x2(self, grid: Sequence[Sequence[int]]) -> List[List[int]]:
+        rows, cols = self._grid_shape(grid)
+        if rows == 0 or cols == 0:
+            return []
+        background = self._background_color(grid)
+        blocks: List[Tuple[int, int]] = []
+        for row_index in range(rows - 1):
+            for col_index in range(cols - 1):
+                cells = [
+                    int(grid[row_index][col_index]),
+                    int(grid[row_index][col_index + 1]),
+                    int(grid[row_index + 1][col_index]),
+                    int(grid[row_index + 1][col_index + 1]),
+                ]
+                if all(color != background for color in cells):
+                    blocks.append((row_index, col_index))
+        if len(blocks) != 1:
+            return [list(map(int, row)) for row in grid]
+
+        row_index, col_index = blocks[0]
+        top_left = int(grid[row_index][col_index])
+        top_right = int(grid[row_index][col_index + 1])
+        bottom_left = int(grid[row_index + 1][col_index])
+        bottom_right = int(grid[row_index + 1][col_index + 1])
+        out = [list(map(int, row)) for row in grid]
+        left_width = min(2, cols)
+        right_start = max(0, cols - 2)
+        for row in range(max(0, row_index - 2), row_index):
+            for col in range(left_width):
+                out[row][col] = bottom_right
+            for col in range(right_start, cols):
+                out[row][col] = bottom_left
+        for row in range(row_index + 2, min(rows, row_index + 4)):
+            for col in range(left_width):
+                out[row][col] = top_right
+            for col in range(right_start, cols):
+                out[row][col] = top_left
+        return out
+
+    def _rowwise_terminal_shift(self, grid: Sequence[Sequence[int]], dc: int, mode: str) -> List[List[int]]:
+        rows, cols = self._grid_shape(grid)
+        if rows == 0 or cols == 0:
+            return []
+        background = self._background_color(grid)
+        out: List[List[int]] = []
+        for row_index, row in enumerate(grid):
+            values = [int(color) for color in row]
+            if all(color == background for color in values):
+                out.append(list(values))
+                continue
+            next_row_is_background = row_index + 1 >= rows or all(int(color) == background for color in grid[row_index + 1])
+            if next_row_is_background and self._longest_non_background_run(values, background) >= 3:
+                out.append(list(values))
+                continue
+            shifted = [int(background) for _ in range(cols)]
+            for col_index, color in enumerate(values):
+                if int(color) == int(background):
+                    continue
+                nc = col_index + int(dc)
+                if mode == "clamp":
+                    nc = max(0, min(cols - 1, nc))
+                if 0 <= nc < cols:
+                    shifted[nc] = int(color)
+            out.append(shifted)
+        return out
+
+    @staticmethod
+    def _longest_non_background_run(row: Sequence[int], background: int) -> int:
+        longest = 0
+        current = 0
+        for color in row:
+            if int(color) == int(background):
+                current = 0
+            else:
+                current += 1
+                longest = max(longest, current)
+        return longest
 
     @staticmethod
     def _grid_shape(grid: Sequence[Sequence[int]]) -> Tuple[int, int]:
@@ -922,6 +1271,12 @@ class _ProgramState:
         if not counts:
             return 0
         return max(counts.items(), key=lambda item: (item[1], -item[0]))[0]
+
+    @classmethod
+    def _background_color(cls, grid: Sequence[Sequence[int]]) -> int:
+        if any(int(color) == 0 for row in grid for color in row):
+            return 0
+        return cls._most_common_color(grid)
 
     @staticmethod
     def _translate_non_background(grid: Sequence[Sequence[int]], dr: int, dc: int, background: int, *, mode: str = "drop") -> List[List[int]]:

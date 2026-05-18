@@ -534,13 +534,18 @@ def _support_cv_deployment_score(program: OperatorProgram, metrics: Mapping[str,
     cell_score = float(metrics["cell_accuracy"])
     exact_score = float(metrics["exact_task_accuracy"])
     step_names = {step.name for step in program.primitive_sequence}
-    penalty = 0.0
+    translation_penalty = 0.0
+    exact_repair_penalty = 0.0
     if "support_translation_mapping" in step_names and exact_score <= 0.0 and cell_score < 0.75:
-        penalty = 0.25
+        translation_penalty = 0.25
+    if "support_exact_repair_search" in step_names and exact_score <= 0.0 and cell_score < 0.75:
+        exact_repair_penalty = 0.30
+    penalty = max(translation_penalty, exact_repair_penalty)
     return cell_score - penalty, {
         "raw_cell_accuracy": cell_score,
         "exact_task_accuracy": exact_score,
-        "translation_low_confidence_penalty": penalty,
+        "translation_low_confidence_penalty": translation_penalty,
+        "exact_repair_low_confidence_penalty": exact_repair_penalty,
     }
 
 
@@ -668,6 +673,7 @@ def _validate_arc_candidate_program(
         "support_geometric_transform_mapping",
         "support_nested_ring_reversal_mapping",
         "support_translation_mapping",
+        "support_exact_repair_search",
     }
     support_symbolic_wrapper_primitives = support_only_symbolic_primitives | {
         "constant_lr",

@@ -159,6 +159,138 @@ def test_arc_translation_program_solves_support_only_shift():
     assert details.primitive_effects["support_translation_dc"] == 1.0
 
 
+def _run_support_exact_repair(payload):
+    task = arc_benchmark._arc_payload_to_task("exact_repair", "test", payload)
+    program = OperatorProgram(
+        "test_support_exact_repair_search",
+        (PrimitiveStep("support_exact_repair_search"),),
+    )
+    context = OperatorExecutionContext(
+        model=torch.nn.Linear(arc_benchmark.ARC_FEATURE_DIM, 10),
+        task=task,
+        task_embedding=torch.zeros(8),
+        base_inner_lr=0.01,
+        inner_steps=1,
+    )
+    _, details = compile_operator_program(program).adapt_params(context)
+    assert details.prediction_override is not None
+    metrics = arc_benchmark._grid_metrics_from_predictions(task, details.prediction_override)
+    assert metrics["exact"] is True
+    assert metrics["cell_accuracy"] == 1.0
+    assert details.primitive_effects["support_exact_repair_exact"] == 1.0
+    return details
+
+
+def test_arc_exact_repair_solves_binary_mask_recolor():
+    payload = {
+        "train": [
+            {
+                "input": [[4, 5, 4], [5, 5, 5], [4, 5, 4]],
+                "output": [[0, 4, 0], [4, 4, 4], [0, 4, 0]],
+            },
+            {
+                "input": [[5, 6, 6], [6, 5, 6], [6, 6, 5]],
+                "output": [[6, 0, 0], [0, 6, 0], [0, 0, 6]],
+            },
+        ],
+        "test": [
+            {
+                "input": [[3, 5, 3], [5, 3, 5], [3, 5, 3]],
+                "output": [[0, 3, 0], [3, 0, 3], [0, 3, 0]],
+            }
+        ],
+    }
+    details = _run_support_exact_repair(payload)
+    assert any(key.startswith("support_exact_repair_method:binary_mask") for key in details.primitive_effects)
+
+
+def test_arc_exact_repair_solves_edge_reflection_and_rectangle_fill():
+    reflection_payload = {
+        "train": [
+            {
+                "input": [[2, 2, 2], [3, 3, 3], [0, 0, 0], [0, 0, 0], [0, 0, 0]],
+                "output": [[2, 2, 2], [3, 3, 3], [0, 0, 0], [3, 3, 3], [2, 2, 2]],
+            },
+            {
+                "input": [[8, 8, 8, 8], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+                "output": [[8, 8, 8, 8], [0, 0, 0, 0], [0, 0, 0, 0], [8, 8, 8, 8]],
+            },
+        ],
+        "test": [
+            {
+                "input": [[3, 3, 3, 3], [5, 5, 5, 5], [5, 5, 5, 5], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+                "output": [[3, 3, 3, 3], [5, 5, 5, 5], [5, 5, 5, 5], [5, 5, 5, 5], [5, 5, 5, 5], [3, 3, 3, 3]],
+            }
+        ],
+    }
+    _run_support_exact_repair(reflection_payload)
+
+    rectangle_payload = {
+        "train": [
+            {
+                "input": [[4, 0, 4], [0, 0, 0], [4, 0, 4]],
+                "output": [[4, 0, 4], [0, 2, 0], [4, 0, 4]],
+            },
+            {
+                "input": [[4, 0, 0, 4], [0, 0, 0, 0], [0, 0, 0, 0], [4, 0, 0, 4]],
+                "output": [[4, 0, 0, 4], [0, 2, 2, 0], [0, 2, 2, 0], [4, 0, 0, 4]],
+            },
+        ],
+        "test": [
+            {
+                "input": [[4, 0, 0, 0, 4], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [4, 0, 0, 0, 4]],
+                "output": [[4, 0, 0, 0, 4], [0, 2, 2, 2, 0], [0, 2, 2, 2, 0], [4, 0, 0, 0, 4]],
+            }
+        ],
+    }
+    _run_support_exact_repair(rectangle_payload)
+
+
+def test_arc_exact_repair_solves_corner_projection_and_terminal_shift():
+    corner_payload = {
+        "train": [
+            {
+                "input": [[0, 0, 0, 0, 0, 0], [0, 4, 6, 0, 0, 0], [0, 2, 1, 0, 0, 0], [0, 0, 0, 0, 0, 0]],
+                "output": [[1, 1, 0, 0, 2, 2], [0, 4, 6, 0, 0, 0], [0, 2, 1, 0, 0, 0], [6, 6, 0, 0, 4, 4]],
+            },
+            {
+                "input": [[0, 0, 0, 0, 0, 0], [0, 0, 9, 3, 0, 0], [0, 0, 7, 8, 0, 0], [0, 0, 0, 0, 0, 0]],
+                "output": [[8, 8, 0, 0, 7, 7], [0, 0, 9, 3, 0, 0], [0, 0, 7, 8, 0, 0], [3, 3, 0, 0, 9, 9]],
+            },
+        ],
+        "test": [
+            {
+                "input": [[0, 0, 0, 0, 0, 0], [0, 0, 3, 1, 0, 0], [0, 0, 2, 5, 0, 0], [0, 0, 0, 0, 0, 0]],
+                "output": [[5, 5, 0, 0, 2, 2], [0, 0, 3, 1, 0, 0], [0, 0, 2, 5, 0, 0], [1, 1, 0, 0, 3, 3]],
+            }
+        ],
+    }
+    _run_support_exact_repair(corner_payload)
+
+    def terminal_shift(grid):
+        out = []
+        for row_index, row in enumerate(grid):
+            next_empty = row_index + 1 >= len(grid) or all(value == 0 for value in grid[row_index + 1])
+            longest = max((len(run) for run in "".join("1" if value else "0" for value in row).split("0")), default=0)
+            if next_empty and longest >= 3:
+                out.append(list(row))
+            else:
+                out.append([0] + row[:-1])
+        return out
+
+    train_a = [[0, 6, 6, 6, 0], [0, 6, 0, 6, 0], [0, 0, 6, 6, 6]]
+    train_b = [[0, 8, 8, 8, 8], [0, 8, 0, 0, 8], [0, 0, 8, 8, 8]]
+    test = [[0, 4, 4, 4, 0], [0, 4, 0, 4, 0], [0, 0, 4, 4, 4]]
+    shift_payload = {
+        "train": [
+            {"input": train_a, "output": terminal_shift(train_a)},
+            {"input": train_b, "output": terminal_shift(train_b)},
+        ],
+        "test": [{"input": test, "output": terminal_shift(test)}],
+    }
+    _run_support_exact_repair(shift_payload)
+
+
 def test_arc_external_rsi_smoke_reports_baseline_to_evolved(tmp_path, monkeypatch):
     root = _write_arc_fixture(tmp_path / "arc", count=8)
 

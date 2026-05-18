@@ -138,6 +138,20 @@ class CandidateGenerator:
             out.append(
                 (
                     self._program(
+                        f"g{generation}_support_exact_repair_search",
+                        (PrimitiveStep("support_exact_repair_search"),),
+                        self._perturbed_params(best),
+                        best,
+                        generation,
+                    ),
+                    "support_exact_repair_search_mutation",
+                    "search support-only exact-grid repair programs before held-out ARC scoring",
+                    [best.program_id],
+                )
+            )
+            out.append(
+                (
+                    self._program(
                         f"g{generation}_support_geometric_transform_mapping",
                         (PrimitiveStep("support_geometric_transform_mapping"),),
                         self._perturbed_params(best),

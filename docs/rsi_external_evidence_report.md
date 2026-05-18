@@ -34,9 +34,9 @@ Scope:
 - Candidate acceptance uses validation and hidden validation only.
 - Final held-out test scoring is frozen after candidate decisions.
 - Per-task final selection uses leave-one-demonstration-out support cross-validation on public ARC training examples, not held-out test labels.
-- OMEGA-THDSE-inspired ARC additions use deterministic 10,000-dimensional FHRR-style phase signatures, support-only geometric/color transforms, a nested-ring topological rule, and support-only object translation with drop/clamp boundary modes.
+- OMEGA-THDSE-inspired ARC additions use deterministic 10,000-dimensional FHRR-style phase signatures, support-only geometric/color transforms, a nested-ring topological rule, support-only object translation with drop/clamp boundary modes, and support-only exact-grid repair search.
 - Support-symbolic candidates may use a small hidden-cell tolerance only when validation gain is positive, exact-grid accuracy does not regress, deterministic replay passes, runtime behavior changes, and final deployment is still selected by support cross-validation.
-- Low-confidence support-translation programs receive a deployment penalty when leave-one-demonstration-out support accuracy is below `0.75` and exact support accuracy is zero.
+- Low-confidence support-translation and exact-repair programs receive a deployment penalty when leave-one-demonstration-out support accuracy is weak and exact support accuracy is zero.
 
 Commands:
 
@@ -79,6 +79,8 @@ python benchmarks/arc_external_rsi_benchmark.py --mode quick --seed 44 --arc-dat
 python benchmarks/arc_external_rsi_benchmark.py --mode full --seed 42 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_hdc_ring_tolerant2_full_seed42.json
 python benchmarks/arc_external_rsi_benchmark.py --mode quick --seed 42 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_hdc_translation_guarded_quick_seed42.json
 python benchmarks/arc_external_rsi_benchmark.py --mode full --seed 42 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_hdc_translation_guarded_full_seed42.json
+python benchmarks/arc_external_rsi_benchmark.py --mode quick --seed 42 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_exact_repair_guarded_quick_seed42.json
+python benchmarks/arc_external_rsi_benchmark.py --mode full --seed 42 --arc-data-dir ../external_arc_agi --no-download --output results/arc_external_rsi_exact_repair_guarded_full_seed42.json
 ```
 
 Quick-mode comparison:
@@ -100,8 +102,30 @@ Interpretation:
 
 - The OMEGA-inspired path produced a real quick-mode improvement, mostly by solving a nested-ring ARC task that the prior DSL missed.
 - The later support-translation guard produced a verified full seed-42 cell-accuracy improvement over the previous HDC/topological full result.
-- Exact-grid accuracy still did not improve on the full seed-42 split.
+- The later exact-repair search produced verified full seed-42 exact-grid improvement.
 - This is bounded symbolic/topological program induction, not AGI, quasi-AGI, or open-ended self-improvement.
+
+## Exact-Repair ARC Rerun
+
+`support_exact_repair_search` is an executable DSL primitive that tries support-only repair programs for binary mask recoloring, edge reflection, marker-rectangle fill, 2x2 corner projection, and rowwise terminal shifts. Candidate acceptance still uses validation and hidden validation only. Final deployment still uses leave-one-demonstration-out support cross-validation, and low-confidence exact-repair deployment is penalized.
+
+| Mode/seed | Baseline cell | Previous guarded cell | Exact-repair cell | Cell delta | Previous exact | Exact-repair exact |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| quick/42 | `0.6445714286` | `0.9475510204` | `0.9577142857` | `+0.3131428571` | `0.2` | `0.4` |
+| full/42 | `0.6680555556` | `0.7827777778` | `0.9244444444` | `+0.2563888889` | `0.0` | `0.625` |
+
+Full seed-42 exact task breakdown after exact repair:
+
+| Task ID | Baseline cell | Evolved cell | Exact |
+| --- | ---: | ---: | ---: |
+| `93b581b8` | `0.555556` | `1.000000` | yes |
+| `025d127b` | `0.820000` | `1.000000` | yes |
+| `aba27056` | `0.640000` | `0.670000` | no |
+| `1f642eb9` | `0.770000` | `0.930000` | no |
+| `f76d97a5` | `0.640000` | `1.000000` | yes |
+| `af902bf9` | `0.790000` | `1.000000` | yes |
+| `496994bd` | `0.400000` | `1.000000` | yes |
+| `5521c0d9` | `0.728889` | `0.795556` | no |
 
 ## HumanEval Coding Benchmark Protocol
 
@@ -149,11 +173,11 @@ python -m pytest -q
 Observed result:
 
 - Focused benchmark/operator tests passed.
-- Full suite passed after the HDC/topological/translation ARC upgrade: `165 passed`.
+- Full suite passed after the HDC/topological/translation/exact-repair ARC upgrade: `168 passed`.
 
 ## Remaining Work
 
-- Increase ARC exact-grid success, especially in full mode.
+- Increase ARC exact-grid success beyond `5 / 8` on the current full seed-42 same-shape split.
 - Add a non-template coding synthesizer or LLM-backed coding generator if credentials and model policy permit.
 - Add more seeds and confidence intervals.
 - Evaluate on variable-shape ARC tasks.
