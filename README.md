@@ -22,7 +22,7 @@ Current full regression check:
 
 ```bash
 python -m pytest -q
-# 175 passed
+# 203 passed
 ```
 
 ## Main Components
@@ -38,10 +38,10 @@ python -m pytest -q
 - `failure_grammar.py`: rejected-candidate rules reused in later generations.
 - `evaluator_evolution.py`: probationary evaluator mutation under adversarial checks.
 - `research_goal_controller.py`: benchmark-evidence to research-goal generation and meta-meta goal-policy search.
-- `neural_search/`: explicit architecture genomes, deterministic bounded mutations, weight inheritance, and validation-only neural candidate sandboxing.
+- `neural_search/`: explicit architecture genomes, deterministic bounded mutations, weight inheritance, multi-domain task families, representation/gradient probes, mutation policies, search history, and validation-only neural candidate evaluation.
 - `failure_residue/`: structured failure residue extraction with held-out leakage refusal and missing-module inference.
 - `world_model_v2/`: object-centric state, causal graph, intervention, counterfactual rollout, and uncertainty decomposition utilities.
-- `meta_rsi/`: higher-level bounded orchestration over residues, neural search candidates, registry updates, experiment plans, and audit reports.
+- `meta_rsi/`: higher-level bounded orchestration over residues, neural search candidates, search-space registry updates, experiment plans, evaluator repair proposals, and audit reports.
 - `orchestrator_core/`: typed artifact routing and integration scaffold.
 - `interaction_*`: bounded interaction-residue simulation and evaluation tools.
 
@@ -80,6 +80,20 @@ Research-goal generation:
 python benchmarks/research_goal_generation_benchmark.py --mode smoke --seed 42
 ```
 
+Multi-domain neural exploration:
+
+```bash
+python benchmarks/deep_neural_exploration_benchmark.py --mode smoke --seed 42
+python benchmarks/deep_neural_exploration_benchmark.py --mode quick --seed 42
+```
+
+Autonomous neural exploration loop:
+
+```bash
+python benchmarks/autonomous_neural_exploration_loop.py --mode smoke --seed 42
+python benchmarks/autonomous_neural_exploration_loop.py --mode quick --seed 42
+```
+
 Other runnable entry points:
 
 ```bash
@@ -116,6 +130,7 @@ pip install pytest
 ## Supported Claims
 
 - Bounded operator/program candidates can be generated, validated, accepted or rejected, rolled back, reused, and evaluated on held-out tasks.
+- Bounded neural architecture candidates can be mutated, trained across procedural task families, probed for representation and gradient failures, selected on validation/hidden-validation evidence, rolled back, frozen, and then evaluated on held-out transfer splits.
 - The ARC adapter shows measured held-out improvement on a disclosed public same-shape subset.
 - The repository includes anti-cheat checks for split leakage, query-target storage, hidden-validation acceptance, deterministic replay, dead code, and control policies.
 - The research-goal controller can generate auditable next objectives from benchmark evidence.
@@ -127,6 +142,7 @@ pip install pytest
 - This does not prove open-ended autonomous recursive self-improvement.
 - The ARC result is not an official ARC leaderboard score.
 - The HumanEval template harness does not prove general coding ability.
+- The autonomous neural exploration benchmark uses small procedural task families; it is a research-loop signal, not a general intelligence result.
 
 ## Documentation
 
