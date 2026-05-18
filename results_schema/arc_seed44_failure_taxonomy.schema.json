@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/deepneural-autoexploration/arc_seed44_failure_taxonomy.schema.json",
+  "title": "ARC Seed-44 Failure Residue Taxonomy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "benchmark_name",
+    "seed",
+    "failure_type",
+    "failed_operator_or_architecture",
+    "suspected_bottleneck",
+    "evidence_metrics",
+    "missing_representation_hypothesis",
+    "proposed_operator_or_module_family",
+    "split_used",
+    "used_heldout_labels"
+  ],
+  "properties": {
+    "task_id": { "type": "string", "minLength": 1 },
+    "benchmark_name": { "type": "string", "minLength": 1 },
+    "seed": { "type": "integer" },
+    "failure_type": {
+      "type": "string",
+      "enum": [
+        "object-binding failure",
+        "variable-shape failure",
+        "color-rule ambiguity",
+        "insufficient support evidence",
+        "primitive-library blind spot",
+        "evaluator-selection failure",
+        "architecture-representation bottleneck"
+      ]
+    },
+    "failed_operator_or_architecture": { "type": "string", "minLength": 1 },
+    "suspected_bottleneck": { "type": "string", "minLength": 1 },
+    "evidence_metrics": {
+      "type": "object",
+      "additionalProperties": { "type": "number" }
+    },
+    "missing_representation_hypothesis": { "type": "string", "minLength": 1 },
+    "proposed_operator_or_module_family": { "type": "string", "minLength": 1 },
+    "split_used": {
+      "type": "string",
+      "enum": ["train", "validation", "hidden_validation"]
+    },
+    "used_heldout_labels": { "type": "boolean", "const": false }
+  }
+}
