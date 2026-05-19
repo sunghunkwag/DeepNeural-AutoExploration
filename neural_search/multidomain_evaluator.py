@@ -212,6 +212,7 @@ class MultiDomainEvaluator:
         candidate_gradient_probe: object | None = None,
         rollback_risk: float = 0.0,
         module_contribution_score: float = 0.0,
+        objective_config: object | None = None,
     ) -> CandidateSelectionDecision:
         validation_improvement = parent_eval.validation_loss - candidate_eval.validation_loss
         hidden_improvement = parent_eval.hidden_validation_loss - candidate_eval.hidden_validation_loss
@@ -226,6 +227,7 @@ class MultiDomainEvaluator:
             rollback_risk=0.0,
             task_family_regression_penalty=0.0,
             module_contribution_score=module_contribution_score,
+            objective_config=objective_config,
         )
         candidate_components = selection_score_components(
             candidate,
@@ -235,6 +237,7 @@ class MultiDomainEvaluator:
             rollback_risk=rollback_risk,
             task_family_regression_penalty=regression_penalty,
             module_contribution_score=module_contribution_score,
+            objective_config=objective_config,
         )
         parent_score = parent_components["selection_score"]
         candidate_score = candidate_components["selection_score"]
@@ -327,7 +330,9 @@ def selection_score_components(
     rollback_risk: float = 0.0,
     task_family_regression_penalty: float = 0.0,
     module_contribution_score: float = 0.0,
+    objective_config: object | None = None,
 ) -> Dict[str, float]:
+    weights = _objective_weights(objective_config)
     representation_failure_penalty = _probe_failure_penalty(representation_probe, collapse_weight=True)
     gradient_failure_penalty = _probe_failure_penalty(gradient_probe, collapse_weight=False)
     generalization_gap_penalty = max(0.0, evaluation.generalization_gap)
@@ -336,17 +341,17 @@ def selection_score_components(
     hidden_component = 1.0 / (1.0 + max(0.0, evaluation.hidden_validation_loss))
     module_contribution_component = min(1.0, max(0.0, float(module_contribution_score)))
     score = (
-        0.30 * validation_component
-        + 0.35 * hidden_component
-        + 0.12 * evaluation.cross_domain_transfer_score
+        weights["validation_loss_weight"] * validation_component
+        + weights["hidden_validation_loss_weight"] * hidden_component
+        + weights["transfer_score_weight"] * evaluation.cross_domain_transfer_score
         + 0.05 * evaluation.adaptation_speed
-        + 0.05 * module_contribution_component
-        - 0.08 * generalization_gap_penalty
-        - 0.06 * complexity_penalty
-        - 0.08 * representation_failure_penalty
-        - 0.08 * gradient_failure_penalty
-        - 0.08 * max(0.0, float(rollback_risk))
-        - 0.15 * max(0.0, float(task_family_regression_penalty))
+        + weights["module_contribution_weight"] * module_contribution_component
+        - weights["generalization_gap_penalty_weight"] * generalization_gap_penalty
+        - weights["architecture_complexity_penalty_weight"] * complexity_penalty
+        - weights["representation_failure_penalty_weight"] * representation_failure_penalty
+        - weights["gradient_failure_penalty_weight"] * gradient_failure_penalty
+        - weights["rollback_risk_weight"] * max(0.0, float(rollback_risk))
+        - weights["task_family_regression_penalty_weight"] * max(0.0, float(task_family_regression_penalty))
     )
     return {
         "validation_loss": float(evaluation.validation_loss),
@@ -360,6 +365,7 @@ def selection_score_components(
         "task_family_regression_penalty": float(task_family_regression_penalty),
         "module_contribution_score": float(module_contribution_component),
         "selection_score": float(score),
+        **{f"objective_{key}": float(value) for key, value in weights.items()},
     }
 
 
@@ -389,3 +395,34 @@ def _task_family_regressions(
         if regression > 1e-5:
             regressions[family] = regression
     return regressions
+
+
+def _objective_weights(config: object | None) -> Dict[str, float]:
+    defaults = {
+        "validation_loss_weight": 0.30,
+        "hidden_validation_loss_weight": 0.35,
+        "transfer_score_weight": 0.12,
+        "generalization_gap_penalty_weight": 0.08,
+        "architecture_complexity_penalty_weight": 0.06,
+        "representation_failure_penalty_weight": 0.08,
+        "gradient_failure_penalty_weight": 0.08,
+        "rollback_risk_weight": 0.08,
+        "task_family_regression_penalty_weight": 0.15,
+        "module_contribution_weight": 0.05,
+    }
+    if config is None:
+        return defaults
+    if hasattr(config, "to_dict"):
+        raw = config.to_dict()
+    elif isinstance(config, Mapping):
+        raw = config
+    else:
+        raw = {}
+    if not isinstance(raw, Mapping):
+        return defaults
+    out = dict(defaults)
+    for key in defaults:
+        value = raw.get(key)
+        if isinstance(value, (int, float)):
+            out[key] = float(max(0.0, min(1.0, value)))
+    return out

@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Sequence
@@ -27,8 +28,10 @@ from neural_search import ArchitectureGenome
 from neural_search.agi_relevance_metrics import compute_agi_relevance_metrics
 from neural_search.deep_search_controller import DeepSearchController
 from neural_search.gradient_probe import gradient_failures_to_traces, probe_gradients
+from neural_search.meta_meta_meta_controller import MetaMetaMetaController
 from neural_search.multidomain_evaluator import MultiDomainEvaluator
 from neural_search.mutation_policy import MutationPolicy
+from neural_search.next_run_config import NextRunConfig
 from neural_search.representation_probe import probe_representations, representation_failures_to_traces
 from neural_search.search_history import SearchHistory
 from neural_search.task_families import (
@@ -64,14 +67,23 @@ def _mode_config(mode: str) -> Dict[str, int | float | str]:
     }[mode]
 
 
-def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
+def run(
+    mode: str,
+    seed: int,
+    output: str | None = None,
+    next_run_config: str | Dict[str, object] | NextRunConfig | None = None,
+) -> Dict[str, object]:
     cfg = _mode_config(mode)
+    next_cfg = _load_next_run_config(next_run_config)
+    if next_cfg is not None:
+        cfg = _apply_next_run_config(cfg, next_cfg)
     output_path = Path(output or f"results/autonomous_neural_exploration_{mode}_seed{seed}.json")
     manifest_path = output_path.with_suffix(".manifest.json")
     task_families = build_multidomain_task_families(
         seed=seed,
         samples_per_split=int(cfg["samples_per_split"]),
         difficulty=str(cfg["difficulty"]),
+        curriculum_config=next_cfg.curriculum_strategy_config if next_cfg is not None else None,
     )
     assert_disjoint_multidomain_splits(task_families)
 
@@ -173,6 +185,12 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
             generation=generation,
         )
         deep_decision = deep_output.decision
+        if next_cfg is not None:
+            adjusted_methods = _apply_strategy_config_to_methods(
+                deep_decision.selected_mutation_methods,
+                next_cfg.search_strategy_config,
+            )
+            deep_decision = replace(deep_decision, selected_mutation_methods=adjusted_methods)
         deep_search_decisions.append({"generation": generation, **deep_decision.to_dict()})
         search_depth_by_generation.append(
             {
@@ -232,6 +250,7 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
                 candidate_gradient_probe=candidate_gradient_probe,
                 rollback_risk=deep_decision.rollback_risk,
                 module_contribution_score=deep_output.credit_report.module_contribution_score,
+                objective_config=next_cfg.evaluator_objective_config if next_cfg is not None else None,
             )
             decision_dict = decision.to_dict()
             decision_dict["generation"] = generation
@@ -362,6 +381,7 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
         "mode": mode,
         "seed": seed,
         "config": cfg,
+        "applied_next_run_config": None if next_cfg is None else next_cfg.to_dict(),
         "base_genome": base_genome.to_dict(),
         "final_genome": current_genome.to_dict(),
         "candidate_genomes": candidate_genomes,
@@ -437,6 +457,25 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
     }
     result["agi_relevance_metrics"] = compute_agi_relevance_metrics(result)
     result["research_goal_controller_input"]["agi_relevance_metrics"] = result["agi_relevance_metrics"]  # type: ignore[index]
+    meta_meta_meta = MetaMetaMetaController().run(
+        result,
+        base_search_config=next_cfg.search_strategy_config if next_cfg is not None else None,
+        base_evaluator_config=next_cfg.evaluator_objective_config if next_cfg is not None else None,
+        base_curriculum_config=next_cfg.curriculum_strategy_config if next_cfg is not None else None,
+    )
+    result["search_process_diagnosis"] = meta_meta_meta.process_diagnosis.to_dict()
+    result["meta_meta_meta_decision"] = meta_meta_meta.decision.to_dict()
+    result["search_strategy_mutation_plan"] = meta_meta_meta.search_strategy_plan.to_dict()
+    result["evaluator_objective_mutation_plan"] = meta_meta_meta.evaluator_objective_plan.to_dict()
+    result["curriculum_mutation_plan"] = meta_meta_meta.curriculum_plan.to_dict()
+    result["next_experiment_rewrite"] = meta_meta_meta.next_experiment_rewrite.to_dict()
+    result["next_run_config_recommendation"] = meta_meta_meta.next_run_config.to_dict()
+    result["research_goal_controller_input"]["next_experiment_rewrite"] = result["next_experiment_rewrite"]  # type: ignore[index]
+    result["research_goal_controller_input"]["next_run_config_recommendation"] = result["next_run_config_recommendation"]  # type: ignore[index]
+    result["audit_trail"]["meta_meta_meta_decision"] = result["meta_meta_meta_decision"]  # type: ignore[index]
+    result["audit_trail"]["search_strategy_config_suggestion"] = result["search_strategy_mutation_plan"]  # type: ignore[index]
+    result["audit_trail"]["evaluator_objective_config_suggestion"] = result["evaluator_objective_mutation_plan"]  # type: ignore[index]
+    result["audit_trail"]["curriculum_config_suggestion"] = result["curriculum_mutation_plan"]  # type: ignore[index]
     manifest = _build_manifest(result, cfg, seed, mode, output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
@@ -444,6 +483,42 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
     result["manifest_path"] = str(manifest_path)
     output_path.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
     return result
+
+
+def _load_next_run_config(value: str | Dict[str, object] | NextRunConfig | None) -> NextRunConfig | None:
+    if value is None:
+        return None
+    if isinstance(value, NextRunConfig):
+        return value
+    if isinstance(value, str):
+        return NextRunConfig.load(value)
+    if isinstance(value, dict):
+        return NextRunConfig.from_dict(value)
+    raise ValueError("next_run_config must be a path, dict, NextRunConfig, or None")
+
+
+def _apply_next_run_config(cfg: Dict[str, int | float | str], next_cfg: NextRunConfig) -> Dict[str, int | float | str]:
+    updated = dict(cfg)
+    updated["candidate_count"] = max(1, min(6, int(next_cfg.recommended_candidate_count)))
+    updated["generations"] = max(1, min(4, int(next_cfg.recommended_generations)))
+    updated["difficulty"] = next_cfg.curriculum_strategy_config.difficulty
+    updated["next_run_config_applied"] = "true"
+    return updated
+
+
+def _apply_strategy_config_to_methods(methods: Sequence[str], config) -> List[str]:
+    penalties = getattr(config, "mutation_penalties", {})
+    boosts = getattr(config, "mutation_boosts", {})
+    if not isinstance(penalties, dict):
+        penalties = {}
+    if not isinstance(boosts, dict):
+        boosts = {}
+    ranked = sorted(
+        list(methods),
+        key=lambda method: float(boosts.get(method, 0.0)) - float(penalties.get(method, 0.0)),
+        reverse=True,
+    )
+    return ranked or list(methods)
 
 
 def _validation_hidden_mismatch(evaluation) -> float:
@@ -613,6 +688,7 @@ def _build_manifest(
         "seed": seed,
         "config": cfg,
         "config_hash": stable_config_hash({"mode": mode, "seed": seed, **cfg}),
+        "applied_next_run_config": result["applied_next_run_config"],
         "base_genome": result["base_genome"],
         "candidate_genomes": result["candidate_genomes"],
         "mutation_policy": result["mutation_policy"],
@@ -630,6 +706,13 @@ def _build_manifest(
         "final_bottleneck_diagnosis": result["final_bottleneck_diagnosis"],
         "recommended_next_experiment": result["recommended_next_experiment"],
         "research_goal_controller_input": result["research_goal_controller_input"],
+        "search_process_diagnosis": result["search_process_diagnosis"],
+        "meta_meta_meta_decision": result["meta_meta_meta_decision"],
+        "search_strategy_mutation_plan": result["search_strategy_mutation_plan"],
+        "evaluator_objective_mutation_plan": result["evaluator_objective_mutation_plan"],
+        "curriculum_mutation_plan": result["curriculum_mutation_plan"],
+        "next_experiment_rewrite": result["next_experiment_rewrite"],
+        "next_run_config_recommendation": result["next_run_config_recommendation"],
         "accepted_candidates": result["accepted_candidates"],
         "rejected_candidates": result["rejected_candidates"],
         "rollback_count": result["rollback_count"],
@@ -657,8 +740,9 @@ def main() -> None:
     parser.add_argument("--mode", choices=["smoke", "quick"], default="smoke")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output", type=str, default=None)
+    parser.add_argument("--next-run-config", type=str, default=None)
     args = parser.parse_args()
-    result = run(args.mode, args.seed, args.output)
+    result = run(args.mode, args.seed, args.output, args.next_run_config)
     print(json.dumps(result["metrics"], indent=2, sort_keys=True))
     print(f"saved={args.output or f'results/autonomous_neural_exploration_{args.mode}_seed{args.seed}.json'}")
     print(f"manifest={result['manifest_path']}")

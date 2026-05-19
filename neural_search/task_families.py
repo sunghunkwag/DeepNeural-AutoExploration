@@ -72,16 +72,31 @@ def build_multidomain_task_families(
     input_dim: int = 4,
     output_dim: int = 2,
     difficulty: str = "simple",
+    curriculum_config: Mapping[str, object] | object | None = None,
 ) -> List[MultiDomainTaskFamily]:
     if input_dim != 4 or output_dim != 2:
         raise ValueError("multi-domain neural exploration tasks use input_dim=4 and output_dim=2")
     if difficulty not in {"simple", "hard"}:
         raise ValueError("difficulty must be 'simple' or 'hard'")
+    config = _curriculum_mapping(curriculum_config)
+    if config:
+        hard_ratio = float(config.get("hard_mode_ratio", 1.0 if difficulty == "hard" else 0.0))
+        if hard_ratio >= 0.5:
+            difficulty = "hard"
+        elif hard_ratio <= 0.0:
+            difficulty = "simple"
     return [
         MultiDomainTaskFamily(
             family=family,
             splits={
-                split: _make_batch(family, split, seed=seed, samples=max(8, int(samples_per_split)), difficulty=difficulty)
+                split: _make_batch(
+                    family,
+                    split,
+                    seed=seed,
+                    samples=max(8, int(samples_per_split)),
+                    difficulty=difficulty,
+                    curriculum_config=config,
+                )
                 for split in SPLITS
             },
             difficulty=difficulty,
@@ -110,7 +125,15 @@ def task_family_ids(task_families: Iterable[MultiDomainTaskFamily]) -> Dict[str,
     return {split: [family.splits[split].task_id for family in task_families] for split in SPLITS}
 
 
-def _make_batch(family: str, split: str, *, seed: int, samples: int, difficulty: str) -> MultiDomainBatch:
+def _make_batch(
+    family: str,
+    split: str,
+    *,
+    seed: int,
+    samples: int,
+    difficulty: str,
+    curriculum_config: Mapping[str, object] | None = None,
+) -> MultiDomainBatch:
     family_index = TASK_FAMILIES.index(family)
     split_index = SPLITS.index(split)
     g = _generator(seed, family_index, split_index)
@@ -118,13 +141,13 @@ def _make_batch(family: str, split: str, *, seed: int, samples: int, difficulty:
     if family == "function_regression":
         x, y = _function_regression(samples, g, offset, difficulty)
     elif family == "sequence_prediction":
-        x, y = _sequence_prediction(samples, g, offset, difficulty)
+        x, y = _sequence_prediction(samples, g, offset, difficulty, curriculum_config)
     elif family == "object_state_transition":
-        x, y = _object_state_transition(samples, g, offset, difficulty)
+        x, y = _object_state_transition(samples, g, offset, difficulty, curriculum_config)
     elif family == "causal_intervention":
-        x, y = _causal_intervention(samples, g, offset, difficulty)
+        x, y = _causal_intervention(samples, g, offset, difficulty, curriculum_config)
     elif family == "memory_retrieval":
-        x, y = _memory_retrieval(samples, g, offset, difficulty)
+        x, y = _memory_retrieval(samples, g, offset, difficulty, curriculum_config)
     else:
         raise ValueError(f"unknown task family: {family}")
     return MultiDomainBatch(
@@ -153,8 +176,14 @@ def _function_regression(samples: int, g: torch.Generator, offset: float, diffic
     return x, y
 
 
-def _sequence_prediction(samples: int, g: torch.Generator, offset: float, difficulty: str) -> tuple[torch.Tensor, torch.Tensor]:
-    lag = 3 if difficulty == "simple" else 7
+def _sequence_prediction(
+    samples: int,
+    g: torch.Generator,
+    offset: float,
+    difficulty: str,
+    curriculum_config: Mapping[str, object] | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    lag = 3 if difficulty == "simple" else int(_cfg(curriculum_config, "sequence_lag_level", 7.0, 1.0, 12.0))
     total = samples + lag + 2
     base = torch.randn(total, generator=g) * (0.10 if difficulty == "simple" else 0.18)
     signal = torch.sin(torch.linspace(0.0, 4.0 + offset, total)) + base
@@ -175,26 +204,40 @@ def _sequence_prediction(samples: int, g: torch.Generator, offset: float, diffic
     return x, y
 
 
-def _object_state_transition(samples: int, g: torch.Generator, offset: float, difficulty: str) -> tuple[torch.Tensor, torch.Tensor]:
+def _object_state_transition(
+    samples: int,
+    g: torch.Generator,
+    offset: float,
+    difficulty: str,
+    curriculum_config: Mapping[str, object] | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
     pos = torch.randn(samples, 2, generator=g) * (0.6 + abs(offset))
     vel = torch.randn(samples, 2, generator=g) * 0.25 + torch.tensor([0.15 + offset * 0.1, -0.05])
     if difficulty == "simple":
         x = torch.cat([pos, vel], dim=1)
         next_pos = pos + vel + 0.08 * torch.sin(pos)
     else:
+        strength = _cfg(curriculum_config, "object_interaction_strength", 1.0, 0.0, 2.0)
         other = torch.stack([torch.sin(pos[:, 1] + offset), torch.cos(pos[:, 0] - offset)], dim=1)
         relative = other - pos
         distance = torch.norm(relative, dim=1, keepdim=True).clamp_min(0.15)
-        attraction = 0.22 * relative / distance.pow(2).clamp_max(12.0)
-        collision = torch.where(distance < 0.75, -0.35 * relative / distance, torch.zeros_like(relative))
+        attraction = (0.22 * strength) * relative / distance.pow(2).clamp_max(12.0)
+        collision = torch.where(distance < 0.75, (-0.35 * strength) * relative / distance, torch.zeros_like(relative))
         x = torch.cat([pos[:, :1], pos[:, 1:2], vel[:, :1], other[:, :1]], dim=1)
         next_pos = pos + vel + attraction + collision + 0.05 * torch.sin(pos + other)
     return x, next_pos
 
 
-def _causal_intervention(samples: int, g: torch.Generator, offset: float, difficulty: str) -> tuple[torch.Tensor, torch.Tensor]:
+def _causal_intervention(
+    samples: int,
+    g: torch.Generator,
+    offset: float,
+    difficulty: str,
+    curriculum_config: Mapping[str, object] | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
     attr = torch.randn(samples, 1, generator=g) * 0.7
-    confounder = torch.randn(samples, 1, generator=g) * 0.5 + offset
+    confounder_strength = _cfg(curriculum_config, "causal_confounder_strength", 1.0, 0.0, 2.0)
+    confounder = (torch.randn(samples, 1, generator=g) * 0.5 + offset) * confounder_strength
     context = 0.65 * attr + confounder if difficulty == "hard" else torch.randn(samples, 1, generator=g) * 0.4 + offset
     intervention = torch.randn(samples, 1, generator=g) * 0.5 + 0.25 + (0.2 * confounder if difficulty == "hard" else 0.0)
     do_flag = (torch.arange(samples).reshape(-1, 1) % 2).float()
@@ -205,14 +248,20 @@ def _causal_intervention(samples: int, g: torch.Generator, offset: float, diffic
     return x, torch.cat([post, effect], dim=1)
 
 
-def _memory_retrieval(samples: int, g: torch.Generator, offset: float, difficulty: str) -> tuple[torch.Tensor, torch.Tensor]:
-    key_count = 6 if difficulty == "simple" else 10
+def _memory_retrieval(
+    samples: int,
+    g: torch.Generator,
+    offset: float,
+    difficulty: str,
+    curriculum_config: Mapping[str, object] | None = None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    key_count = 6 if difficulty == "simple" else int(_cfg(curriculum_config, "memory_distractor_count", 10.0, 2.0, 16.0))
     keys = torch.randn(key_count, 2, generator=g)
     values = torch.stack([torch.sin(keys[:, 0] * 1.7 + offset) + 0.2 * keys[:, 1], torch.cos(keys[:, 1] * 1.3 - offset) - 0.15 * keys[:, 0]], dim=1)
     indices = torch.arange(samples) % key_count
     noise = torch.randn(samples, 2, generator=g) * ((0.03 + 0.02 * abs(offset)) if difficulty == "simple" else 0.09)
     distractor_indices = (indices + 1 + (torch.arange(samples) % max(1, key_count - 1))) % key_count
-    distractor_mix = 0.0 if difficulty == "simple" else 0.35
+    distractor_mix = 0.0 if difficulty == "simple" else _cfg(curriculum_config, "distractor_intensity", 0.35, 0.0, 1.0)
     query = (1.0 - distractor_mix) * keys.index_select(0, indices) + distractor_mix * keys.index_select(0, distractor_indices) + noise
     context = torch.stack([
         torch.full((samples,), float(key_count) / 10.0),
@@ -229,3 +278,25 @@ def split_batches_by_name(task_families: Iterable[MultiDomainTaskFamily]) -> Dic
 
 def serializable_task_families(task_families: Iterable[MultiDomainTaskFamily]) -> List[Dict[str, object]]:
     return [family.to_dict() for family in task_families]
+
+
+def _curriculum_mapping(config: Mapping[str, object] | object | None) -> Mapping[str, object] | None:
+    if config is None:
+        return None
+    if isinstance(config, Mapping):
+        return config
+    to_dict = getattr(config, "to_dict", None)
+    if callable(to_dict):
+        value = to_dict()
+        if isinstance(value, Mapping):
+            return value
+    return None
+
+
+def _cfg(config: Mapping[str, object] | None, key: str, default: float, low: float, high: float) -> float:
+    if not config:
+        return float(default)
+    value = config.get(key, default)
+    if not isinstance(value, (int, float)):
+        return float(default)
+    return float(max(low, min(high, value)))

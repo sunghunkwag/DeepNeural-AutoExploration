@@ -9,6 +9,9 @@ from .architecture_genome import ArchitectureGenome
 from .architecture_evaluator import ArchitectureDecision, ArchitectureEvaluator
 from .agi_relevance_metrics import compute_agi_relevance_metrics
 from .deep_search_controller import DeepSearchController, DeepSearchDecision
+from .meta_meta_meta_controller import MetaMetaMetaController, MetaMetaMetaDecision
+from .next_run_config import NextRunConfig
+from .search_process_model import SearchProcessDiagnosis, SearchProcessModel
 from .gradient_probe import GradientProbeResult, probe_gradients
 from .mutation_operators import MUTATION_METHODS, ArchitectureMutator, mutate_architecture
 from .mutation_policy import MutationPolicy, MutationProposal
@@ -27,6 +30,8 @@ __all__ = [
     "ArchitectureMutator",
     "DeepSearchController",
     "DeepSearchDecision",
+    "MetaMetaMetaController",
+    "MetaMetaMetaDecision",
     "GradientProbeResult",
     "MUTATION_METHODS",
     "MultiDomainBatch",
@@ -36,6 +41,7 @@ __all__ = [
     "NeuralCandidateSandbox",
     "NeuralSandboxResult",
     "NeuralSandboxTask",
+    "NextRunConfig",
     "RepresentationProbeResult",
     "SearchCreditAssigner",
     "SearchCreditReport",
@@ -43,6 +49,8 @@ __all__ = [
     "SearchDepthScheduler",
     "SearchHistory",
     "SearchHistoryRecord",
+    "SearchProcessDiagnosis",
+    "SearchProcessModel",
     "WeightInheritanceReport",
     "build_multidomain_task_families",
     "compute_agi_relevance_metrics",
