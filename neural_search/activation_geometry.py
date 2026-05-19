@@ -22,6 +22,24 @@ def activation_variance(tensor: torch.Tensor) -> float:
     return float(torch.var(flat, dim=0, unbiased=False).mean()) if flat.numel() else 0.0
 
 
+def activation_saturation(tensor: torch.Tensor, threshold: float = 0.97) -> float:
+    flat = flatten_activation(tensor)
+    if not flat.numel():
+        return 0.0
+    squashed = torch.tanh(flat).abs()
+    return float((squashed > float(threshold)).float().mean())
+
+
+def module_overdominance_score(values: Mapping[str, float]) -> float:
+    positives = [abs(float(value)) for value in values.values()]
+    if not positives:
+        return 0.0
+    total = sum(positives)
+    if total <= 1e-12:
+        return 0.0
+    return float(max(positives) / total)
+
+
 def representation_collapse_score(activation_variances: Mapping[str, float]) -> float:
     if not activation_variances:
         return 1.0

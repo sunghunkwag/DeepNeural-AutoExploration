@@ -15,6 +15,11 @@ def test_agi_relevance_metrics_are_computed_from_benchmark_output(tmp_path):
         "heldout_generalization_delta",
         "architecture_diversity_score",
         "mutation_policy_improvement_over_random",
+        "deep_search_efficiency",
+        "residue_resolution_rate",
+        "task_family_balance_score",
+        "rollback_risk_reduction",
+        "search_depth_usefulness",
         "cumulative_autonomous_improvement_score",
     }
     assert required <= set(metrics)

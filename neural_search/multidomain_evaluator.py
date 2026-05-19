@@ -90,6 +90,10 @@ class CandidateSelectionDecision:
     rejection_reason: str
     split_used: str = "validation"
     used_heldout_labels: bool = False
+    selection_score_components: Dict[str, float] = field(default_factory=dict)
+    parent_selection_score: float = 0.0
+    candidate_selection_score: float = 0.0
+    task_family_regressions: Dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, object]:
         return {
@@ -108,6 +112,10 @@ class CandidateSelectionDecision:
             "rejection_reason": self.rejection_reason,
             "split_used": self.split_used,
             "used_heldout_labels": self.used_heldout_labels,
+            "selection_score_components": dict(self.selection_score_components),
+            "parent_selection_score": self.parent_selection_score,
+            "candidate_selection_score": self.candidate_selection_score,
+            "task_family_regressions": dict(self.task_family_regressions),
         }
 
 
@@ -198,15 +206,59 @@ class MultiDomainEvaluator:
         candidate_eval: MultiDomainEvaluation,
         *,
         improvement_threshold: float = 1e-5,
+        parent_representation_probe: object | None = None,
+        candidate_representation_probe: object | None = None,
+        parent_gradient_probe: object | None = None,
+        candidate_gradient_probe: object | None = None,
+        rollback_risk: float = 0.0,
+        module_contribution_score: float = 0.0,
     ) -> CandidateSelectionDecision:
         validation_improvement = parent_eval.validation_loss - candidate_eval.validation_loss
         hidden_improvement = parent_eval.hidden_validation_loss - candidate_eval.hidden_validation_loss
-        score_delta = parent_eval.selection_score() - candidate_eval.selection_score()
+        transfer_delta = candidate_eval.cross_domain_transfer_score - parent_eval.cross_domain_transfer_score
+        task_regressions = _task_family_regressions(parent_eval, candidate_eval)
+        regression_penalty = sum(task_regressions.values()) / max(1, len(candidate_eval.hidden_validation_loss_by_family))
+        parent_components = selection_score_components(
+            parent,
+            parent_eval,
+            representation_probe=parent_representation_probe,
+            gradient_probe=parent_gradient_probe,
+            rollback_risk=0.0,
+            task_family_regression_penalty=0.0,
+            module_contribution_score=module_contribution_score,
+        )
+        candidate_components = selection_score_components(
+            candidate,
+            candidate_eval,
+            representation_probe=candidate_representation_probe,
+            gradient_probe=candidate_gradient_probe,
+            rollback_risk=rollback_risk,
+            task_family_regression_penalty=regression_penalty,
+            module_contribution_score=module_contribution_score,
+        )
+        parent_score = parent_components["selection_score"]
+        candidate_score = candidate_components["selection_score"]
+        score_delta = candidate_score - parent_score
+        unacceptable_hidden_regression = hidden_improvement < -0.02
+        unacceptable_transfer_regression = transfer_delta < -0.05
+        too_many_family_regressions = len(task_regressions) > max(1, len(candidate_eval.hidden_validation_loss_by_family) // 2)
         accepted = bool(
             score_delta > improvement_threshold
             and (validation_improvement > 0.0 or hidden_improvement > 0.0)
+            and not unacceptable_hidden_regression
+            and not unacceptable_transfer_regression
+            and not too_many_family_regressions
         )
-        reason = "accepted" if accepted else "validation_hidden_score_not_improved"
+        if accepted:
+            reason = "accepted"
+        elif unacceptable_hidden_regression:
+            reason = "hidden_validation_regression"
+        elif unacceptable_transfer_regression:
+            reason = "transfer_regression"
+        elif too_many_family_regressions:
+            reason = "task_family_regression"
+        else:
+            reason = "selection_score_not_improved"
         return CandidateSelectionDecision(
             candidate_id=candidate.genome_id,
             parent_id=parent.genome_id,
@@ -221,6 +273,10 @@ class MultiDomainEvaluator:
             validation_metrics={"loss": candidate_eval.validation_loss, **candidate_eval.validation_loss_by_family},
             hidden_validation_metrics={"loss": candidate_eval.hidden_validation_loss, **candidate_eval.hidden_validation_loss_by_family},
             rejection_reason=reason,
+            selection_score_components=candidate_components,
+            parent_selection_score=float(parent_score),
+            candidate_selection_score=float(candidate_score),
+            task_family_regressions=task_regressions,
         )
 
     def _loss_by_family(
@@ -249,3 +305,87 @@ class MultiDomainEvaluator:
 def _mean_dict(values: Mapping[str, float] | Dict[str, float]) -> float:
     vals = [float(value) for value in values.values()]
     return float(mean(vals)) if vals else 0.0
+
+
+def architecture_complexity_penalty(genome: ArchitectureGenome) -> float:
+    module_count = (
+        genome.residual_blocks
+        + genome.memory_gates
+        + genome.causal_bottlenecks
+        + genome.object_binding_adapters
+        + genome.sequence_state_adapters
+    )
+    return float(min(1.0, genome.hidden_dim / 128.0 + 0.035 * module_count))
+
+
+def selection_score_components(
+    genome: ArchitectureGenome,
+    evaluation: MultiDomainEvaluation,
+    *,
+    representation_probe: object | None = None,
+    gradient_probe: object | None = None,
+    rollback_risk: float = 0.0,
+    task_family_regression_penalty: float = 0.0,
+    module_contribution_score: float = 0.0,
+) -> Dict[str, float]:
+    representation_failure_penalty = _probe_failure_penalty(representation_probe, collapse_weight=True)
+    gradient_failure_penalty = _probe_failure_penalty(gradient_probe, collapse_weight=False)
+    generalization_gap_penalty = max(0.0, evaluation.generalization_gap)
+    complexity_penalty = architecture_complexity_penalty(genome)
+    validation_component = 1.0 / (1.0 + max(0.0, evaluation.validation_loss))
+    hidden_component = 1.0 / (1.0 + max(0.0, evaluation.hidden_validation_loss))
+    module_contribution_component = min(1.0, max(0.0, float(module_contribution_score)))
+    score = (
+        0.30 * validation_component
+        + 0.35 * hidden_component
+        + 0.12 * evaluation.cross_domain_transfer_score
+        + 0.05 * evaluation.adaptation_speed
+        + 0.05 * module_contribution_component
+        - 0.08 * generalization_gap_penalty
+        - 0.06 * complexity_penalty
+        - 0.08 * representation_failure_penalty
+        - 0.08 * gradient_failure_penalty
+        - 0.08 * max(0.0, float(rollback_risk))
+        - 0.15 * max(0.0, float(task_family_regression_penalty))
+    )
+    return {
+        "validation_loss": float(evaluation.validation_loss),
+        "hidden_validation_loss": float(evaluation.hidden_validation_loss),
+        "cross_domain_transfer_score": float(evaluation.cross_domain_transfer_score),
+        "generalization_gap_penalty": float(generalization_gap_penalty),
+        "architecture_complexity_penalty": float(complexity_penalty),
+        "representation_failure_penalty": float(representation_failure_penalty),
+        "gradient_failure_penalty": float(gradient_failure_penalty),
+        "rollback_risk": float(rollback_risk),
+        "task_family_regression_penalty": float(task_family_regression_penalty),
+        "module_contribution_score": float(module_contribution_component),
+        "selection_score": float(score),
+    }
+
+
+def _probe_failure_penalty(probe: object | None, *, collapse_weight: bool) -> float:
+    if probe is None:
+        return 0.0
+    modes = list(getattr(probe, "failure_modes", []) or [])
+    penalty = 0.08 * len(modes)
+    if collapse_weight:
+        penalty += 0.20 * max(0.0, float(getattr(probe, "representation_collapse_score", 0.0)))
+        penalty += 0.10 * max(0.0, float(getattr(probe, "validation_hidden_mismatch", 0.0)))
+    else:
+        penalty += 0.15 if float(getattr(probe, "total_gradient_norm", 1.0)) < 1e-6 else 0.0
+    return float(min(1.0, penalty))
+
+
+def _task_family_regressions(
+    parent_eval: MultiDomainEvaluation,
+    candidate_eval: MultiDomainEvaluation,
+) -> Dict[str, float]:
+    regressions: Dict[str, float] = {}
+    for family, parent_loss in parent_eval.hidden_validation_loss_by_family.items():
+        candidate_loss = candidate_eval.hidden_validation_loss_by_family.get(family)
+        if candidate_loss is None:
+            continue
+        regression = float(candidate_loss - parent_loss)
+        if regression > 1e-5:
+            regressions[family] = regression
+    return regressions

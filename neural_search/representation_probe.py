@@ -11,9 +11,11 @@ import torch.nn.functional as F
 
 from .activation_geometry import (
     activation_variance,
+    activation_saturation,
     centroid_separability,
     flatten_activation,
     mean_pairwise_cosine_similarity,
+    module_overdominance_score,
     representation_collapse_score,
 )
 from .task_families import MultiDomainBatch, MultiDomainTaskFamily
@@ -27,7 +29,11 @@ class RepresentationProbeResult:
     task_embedding_separability: float
     hidden_state_similarity: float
     module_ablation_contribution: Dict[str, float]
+    hidden_state_saturation: float = 0.0
+    module_overdominance_score: float = 0.0
+    validation_hidden_mismatch: float = 0.0
     failure_modes: List[str] = field(default_factory=list)
+    recommended_mutations: Dict[str, List[str]] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, object]:
         return {
@@ -36,8 +42,12 @@ class RepresentationProbeResult:
             "representation_collapse_score": self.representation_collapse_score,
             "task_embedding_separability": self.task_embedding_separability,
             "hidden_state_similarity": self.hidden_state_similarity,
+            "hidden_state_saturation": self.hidden_state_saturation,
+            "module_overdominance_score": self.module_overdominance_score,
+            "validation_hidden_mismatch": self.validation_hidden_mismatch,
             "module_ablation_contribution": dict(self.module_ablation_contribution),
             "failure_modes": list(self.failure_modes),
+            "recommended_mutations": {key: list(value) for key, value in self.recommended_mutations.items()},
         }
 
 
@@ -48,6 +58,7 @@ def probe_representations(
     split: str = "validation",
     genome_id: str = "",
     max_ablation_modules: int = 6,
+    validation_hidden_mismatch: float = 0.0,
 ) -> RepresentationProbeResult:
     model.eval()
     captured: Dict[str, List[torch.Tensor]] = {}
@@ -65,6 +76,8 @@ def probe_representations(
         for name, values in captured.items()
         if values
     }
+    saturations = [activation_saturation(torch.cat(values, dim=0)) for values in captured.values() if values]
+    saturation = float(mean(saturations)) if saturations else 0.0
     family_embeddings = _family_embeddings(model, task_families, split=split)
     separability = centroid_separability(family_embeddings)
     similarity = mean_pairwise_cosine_similarity(family_embeddings)
@@ -74,15 +87,21 @@ def probe_representations(
         [family.splits[split] for family in task_families],
         max_modules=max_ablation_modules,
     )
-    failure_modes = _failure_modes(variances, collapse, separability, similarity, ablations)
+    dominance = module_overdominance_score(ablations)
+    failure_modes = _failure_modes(variances, collapse, separability, similarity, ablations, saturation, dominance, validation_hidden_mismatch)
+    recommendations = {mode: _mutations_for_mode(mode) for mode in failure_modes}
     return RepresentationProbeResult(
         genome_id=genome_id,
         activation_variance_by_module=variances,
         representation_collapse_score=collapse,
         task_embedding_separability=separability,
         hidden_state_similarity=similarity,
+        hidden_state_saturation=saturation,
+        module_overdominance_score=dominance,
+        validation_hidden_mismatch=float(validation_hidden_mismatch),
         module_ablation_contribution=ablations,
         failure_modes=failure_modes,
+        recommended_mutations=recommendations,
     )
 
 
@@ -104,8 +123,12 @@ def representation_failures_to_traces(
                 "representation_collapse_score": result.representation_collapse_score,
                 "task_embedding_separability": result.task_embedding_separability,
                 "hidden_state_similarity": result.hidden_state_similarity,
+                "hidden_state_saturation": result.hidden_state_saturation,
+                "module_overdominance_score": result.module_overdominance_score,
+                "validation_hidden_mismatch": result.validation_hidden_mismatch,
             },
             "proposed_operator_or_module_family": _module_family_for_mode(mode),
+            "missing_representation_hypothesis": f"probe detected {mode}; try {', '.join(result.recommended_mutations.get(mode, []))}",
             "split_used": split_used,
             "used_heldout_labels": False,
         }
@@ -196,6 +219,9 @@ def _failure_modes(
     separability: float,
     similarity: float,
     ablations: Dict[str, float],
+    saturation: float,
+    dominance: float,
+    validation_hidden_mismatch: float,
 ) -> List[str]:
     modes: List[str] = []
     if collapse > 0.98 or (variances and max(variances.values()) < 1e-4):
@@ -204,8 +230,14 @@ def _failure_modes(
         modes.append("task-family entanglement")
     if similarity > 0.98:
         modes.append("unstable hidden dynamics")
+    if saturation > 0.45:
+        modes.append("hidden-state saturation")
     if any(abs(value) < 1e-7 for value in ablations.values()):
         modes.append("dead module")
+    if dominance > 0.75 and len(ablations) > 1:
+        modes.append("module over-dominance")
+    if validation_hidden_mismatch > 0.20:
+        modes.append("high validation-hidden-validation mismatch")
     if any("causal_bottlenecks" in name and value < 1e-5 for name, value in variances.items()):
         modes.append("over-compressed bottleneck")
     return sorted(set(modes))
@@ -218,4 +250,20 @@ def _module_family_for_mode(mode: str) -> str:
         "unstable hidden dynamics": "sequence_state_adapter",
         "dead module": "gated_memory_block",
         "over-compressed bottleneck": "causal_bottleneck_block",
+        "hidden-state saturation": "wider_residual_stack",
+        "module over-dominance": "gated_memory_block",
+        "high validation-hidden-validation mismatch": "causal_bottleneck_block",
     }.get(mode, "wider_residual_stack")
+
+
+def _mutations_for_mode(mode: str) -> List[str]:
+    return {
+        "representation collapse": ["wider_residual_stack", "widen_hidden_dim"],
+        "task-family entanglement": ["object_binding_adapter", "add_causal_bottleneck"],
+        "unstable hidden dynamics": ["sequence_state_adapter"],
+        "hidden-state saturation": ["widen_hidden_dim", "add_residual_block"],
+        "dead module": ["add_memory_gate"],
+        "module over-dominance": ["add_memory_gate", "remove_residual_block"],
+        "over-compressed bottleneck": ["repair_bottleneck"],
+        "high validation-hidden-validation mismatch": ["add_causal_bottleneck", "object_binding_adapter"],
+    }.get(mode, ["add_residual_block"])

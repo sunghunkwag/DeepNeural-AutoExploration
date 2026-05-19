@@ -8,12 +8,15 @@ and CPU-runnable; it does not generate or execute arbitrary source code.
 from .architecture_genome import ArchitectureGenome
 from .architecture_evaluator import ArchitectureDecision, ArchitectureEvaluator
 from .agi_relevance_metrics import compute_agi_relevance_metrics
+from .deep_search_controller import DeepSearchController, DeepSearchDecision
 from .gradient_probe import GradientProbeResult, probe_gradients
 from .mutation_operators import MUTATION_METHODS, ArchitectureMutator, mutate_architecture
 from .mutation_policy import MutationPolicy, MutationProposal
 from .neural_candidate_sandbox import NeuralCandidateSandbox, NeuralSandboxResult, NeuralSandboxTask
 from .representation_probe import RepresentationProbeResult, probe_representations
 from .search_history import SearchHistory, SearchHistoryRecord
+from .search_depth_scheduler import SearchDepthAssessment, SearchDepthScheduler
+from .search_credit_assignment import SearchCreditAssigner, SearchCreditReport
 from .task_families import MultiDomainBatch, MultiDomainTaskFamily, build_multidomain_task_families
 from .weight_inheritance import WeightInheritanceReport, inherit_shape_compatible_weights
 
@@ -22,6 +25,8 @@ __all__ = [
     "ArchitectureEvaluator",
     "ArchitectureGenome",
     "ArchitectureMutator",
+    "DeepSearchController",
+    "DeepSearchDecision",
     "GradientProbeResult",
     "MUTATION_METHODS",
     "MultiDomainBatch",
@@ -32,6 +37,10 @@ __all__ = [
     "NeuralSandboxResult",
     "NeuralSandboxTask",
     "RepresentationProbeResult",
+    "SearchCreditAssigner",
+    "SearchCreditReport",
+    "SearchDepthAssessment",
+    "SearchDepthScheduler",
     "SearchHistory",
     "SearchHistoryRecord",
     "WeightInheritanceReport",

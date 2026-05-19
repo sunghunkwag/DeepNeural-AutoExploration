@@ -28,6 +28,9 @@ def test_search_space_expansion_requires_repeated_evidence():
     assert "object_binding_adapter" in updates
     assert updates["object_binding_adapter"]["justification_count"] >= 2
     assert updates["object_binding_adapter"]["audit"]
+    assert updates["object_binding_adapter"]["confidence_score"] > 0.0
+    assert updates["object_binding_adapter"]["recommended_mutation_operators"] == ["object_binding_adapter"]
+    assert updates["object_binding_adapter"]["justifying_residue_ids"]
 
 
 def test_inferencer_maps_probe_failure_to_bounded_module_family():

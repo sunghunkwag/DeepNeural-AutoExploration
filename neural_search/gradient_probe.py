@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from statistics import mean
 from typing import Dict, List, Sequence
 
 import torch
@@ -17,6 +16,8 @@ class GradientProbeResult:
     genome_id: str
     gradient_norm_by_module: Dict[str, float]
     total_gradient_norm: float
+    module_overdominance_score: float = 0.0
+    recommended_mutations: Dict[str, List[str]] = field(default_factory=dict)
     failure_modes: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, object]:
@@ -24,6 +25,8 @@ class GradientProbeResult:
             "genome_id": self.genome_id,
             "gradient_norm_by_module": dict(self.gradient_norm_by_module),
             "total_gradient_norm": self.total_gradient_norm,
+            "module_overdominance_score": self.module_overdominance_score,
+            "recommended_mutations": {key: list(value) for key, value in self.recommended_mutations.items()},
             "failure_modes": list(self.failure_modes),
         }
 
@@ -50,11 +53,14 @@ def probe_gradients(
         module_name = _module_name(name)
         norms[module_name] = norms.get(module_name, 0.0) + float(param.grad.detach().norm())
     total = float(sum(value * value for value in norms.values()) ** 0.5)
-    failures = _failure_modes(norms, total)
+    dominance = _dominance(norms)
+    failures = _failure_modes(norms, total, dominance)
     return GradientProbeResult(
         genome_id=genome_id,
         gradient_norm_by_module=norms,
         total_gradient_norm=total,
+        module_overdominance_score=dominance,
+        recommended_mutations={mode: _mutations_for_mode(mode) for mode in failures},
         failure_modes=failures,
     )
 
@@ -77,8 +83,10 @@ def gradient_failures_to_traces(
                 "total_gradient_norm": result.total_gradient_norm,
                 "min_module_gradient_norm": min(result.gradient_norm_by_module.values()) if result.gradient_norm_by_module else 0.0,
                 "max_module_gradient_norm": max(result.gradient_norm_by_module.values()) if result.gradient_norm_by_module else 0.0,
+                "module_overdominance_score": result.module_overdominance_score,
             },
-            "proposed_operator_or_module_family": "wider_residual_stack" if mode == "gradient bottleneck" else "causal_bottleneck_block",
+            "proposed_operator_or_module_family": _module_family_for_mode(mode),
+            "missing_representation_hypothesis": f"gradient probe detected {mode}; try {', '.join(result.recommended_mutations.get(mode, []))}",
             "split_used": split_used,
             "used_heldout_labels": False,
         }
@@ -93,7 +101,7 @@ def _module_name(parameter_name: str) -> str:
     return parts[0]
 
 
-def _failure_modes(norms: Dict[str, float], total: float) -> List[str]:
+def _failure_modes(norms: Dict[str, float], total: float, dominance: float) -> List[str]:
     modes: List[str] = []
     if total < 1e-6:
         modes.append("gradient bottleneck")
@@ -103,4 +111,28 @@ def _failure_modes(norms: Dict[str, float], total: float) -> List[str]:
             modes.append("dead module")
         if max(values) / max(1e-8, min(value for value in values if value > 0.0) if any(value > 0 for value in values) else 1e-8) > 500.0:
             modes.append("gradient bottleneck")
+        if dominance > 0.80 and len(values) > 1:
+            modes.append("module over-dominance")
     return sorted(set(modes))
+
+
+def _dominance(norms: Dict[str, float]) -> float:
+    values = [abs(float(value)) for value in norms.values()]
+    total = sum(values)
+    return 0.0 if total <= 1e-12 else float(max(values) / total)
+
+
+def _module_family_for_mode(mode: str) -> str:
+    return {
+        "gradient bottleneck": "wider_residual_stack",
+        "dead module": "gated_memory_block",
+        "module over-dominance": "gated_memory_block",
+    }.get(mode, "wider_residual_stack")
+
+
+def _mutations_for_mode(mode: str) -> List[str]:
+    return {
+        "gradient bottleneck": ["add_residual_block", "repair_bottleneck"],
+        "dead module": ["add_memory_gate"],
+        "module over-dominance": ["add_memory_gate", "widen_hidden_dim"],
+    }.get(mode, ["add_residual_block"])

@@ -186,3 +186,26 @@ def _complete_effects(values: Dict[str, float]) -> Dict[str, float]:
     complete = {name: float(values.get(name, 0.0)) for name in SELF_MODEL_TARGETS}
     return complete
 
+
+def architecture_decision_to_effects(decision: Dict[str, object]) -> Dict[str, float | str]:
+    """Convert a neural architecture decision into self-model effect evidence."""
+
+    if bool(decision.get("used_heldout_labels", False)):
+        raise ValueError("self-model architecture evidence cannot use held-out labels")
+    validation = float(decision.get("validation_improvement", 0.0))
+    hidden = float(decision.get("hidden_validation_improvement", 0.0))
+    components = decision.get("selection_score_components", {})
+    rollback_risk = float(components.get("rollback_risk", 0.0)) if isinstance(components, dict) else 0.0
+    effects = _complete_effects(
+        {
+            "validation_improvement": validation,
+            "ood_transfer": hidden,
+            "runtime_cost": float(components.get("architecture_complexity_penalty", 0.0)) if isinstance(components, dict) else 0.0,
+            "instability_risk": 0.0 if decision.get("accepted") else max(rollback_risk, 1.0),
+            "future_candidate_quality": float(decision.get("selection_score_delta", max(validation, hidden))),
+            "controller_prediction_error": abs(validation - hidden),
+            "validation_to_test_gap": abs(validation - hidden),
+        }
+    )
+    return {"program_id": str(decision.get("candidate_id", "")), **effects}
+

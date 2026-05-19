@@ -17,6 +17,20 @@ ARC_FAILURE_TAXONOMY = (
     "architecture-representation bottleneck",
 )
 
+NEURAL_FAILURE_TAXONOMY = (
+    "representation collapse",
+    "gradient bottleneck",
+    "dead module",
+    "over-compressed bottleneck",
+    "task-family entanglement",
+    "unstable hidden dynamics",
+    "hidden-state saturation",
+    "module over-dominance",
+    "high validation-hidden-validation mismatch",
+    "causal intervention failure",
+    "sequence instability",
+)
+
 
 _FAILURE_INFO = {
     "object-binding failure": (
@@ -47,6 +61,50 @@ _FAILURE_INFO = {
         "neural architecture lacks a representation path for the failure pattern",
         "neural architecture expansion",
     ),
+    "representation collapse": (
+        "activation geometry has collapsed or carries too little variance",
+        "wider_residual_stack",
+    ),
+    "gradient bottleneck": (
+        "gradient flow is too small or sharply concentrated in a narrow path",
+        "wider_residual_stack",
+    ),
+    "dead module": (
+        "one or more bounded modules has negligible activation or gradient contribution",
+        "gated_memory_block",
+    ),
+    "over-compressed bottleneck": (
+        "causal bottleneck usage is too low for the task evidence",
+        "causal_bottleneck_block",
+    ),
+    "task-family entanglement": (
+        "task-family embeddings are poorly separated in hidden space",
+        "object_binding_adapter",
+    ),
+    "unstable hidden dynamics": (
+        "hidden states are too similar or unstable across task families",
+        "sequence_state_adapter",
+    ),
+    "hidden-state saturation": (
+        "hidden activations are saturated enough to limit representational range",
+        "wider_residual_stack",
+    ),
+    "module over-dominance": (
+        "one module dominates contribution or gradients over the rest of the architecture",
+        "gated_memory_block",
+    ),
+    "high validation-hidden-validation mismatch": (
+        "validation improves do not survive hidden-validation evidence",
+        "causal_bottleneck_block",
+    ),
+    "causal intervention failure": (
+        "candidate does not separate observed correlation from intervention behavior",
+        "causal_bottleneck_block",
+    ),
+    "sequence instability": (
+        "candidate does not maintain state over longer sequence dependencies",
+        "sequence_state_adapter",
+    ),
 }
 
 
@@ -69,7 +127,7 @@ def _numeric_metrics(trace: Mapping[str, object]) -> Dict[str, float]:
 
 def classify_failure_type(trace: Mapping[str, object]) -> str:
     explicit = str(trace.get("failure_type", "")).strip()
-    if explicit in ARC_FAILURE_TAXONOMY:
+    if explicit in ARC_FAILURE_TAXONOMY or explicit in NEURAL_FAILURE_TAXONOMY:
         return explicit
 
     metrics = _numeric_metrics(trace)
@@ -91,6 +149,12 @@ def classify_failure_type(trace: Mapping[str, object]) -> str:
         return "evaluator-selection failure"
     if metrics.get("parameter_budget_pressure", 0.0) > 0.0 or "architecture" in reason or "representation" in reason:
         return "architecture-representation bottleneck"
+    if "gradient" in reason:
+        return "gradient bottleneck"
+    if "sequence" in reason:
+        return "sequence instability"
+    if "causal" in reason or "intervention" in reason:
+        return "causal intervention failure"
     return explicit or "validation failure"
 
 

@@ -59,60 +59,84 @@ class ResidualMLPBlock(nn.Module):
 
 
 class MemoryGate(nn.Module):
-    """A small gated state update over the hidden representation."""
+    """Read/write-style gated memory block over the hidden representation."""
 
-    def __init__(self, hidden_dim: int):
+    def __init__(self, hidden_dim: int, memory_slots: int = 2):
         super().__init__()
-        self.gate = nn.Linear(hidden_dim, hidden_dim)
-        self.candidate = nn.Linear(hidden_dim, hidden_dim)
+        self.memory_slots = max(1, int(memory_slots))
+        self.memory_bank = nn.Parameter(torch.randn(self.memory_slots, hidden_dim) * 0.02)
+        self.read_gate = nn.Linear(hidden_dim, self.memory_slots)
+        self.write_gate = nn.Linear(hidden_dim, hidden_dim)
+        self.candidate = nn.Linear(hidden_dim * 2, hidden_dim)
+        self.last_read_weights: torch.Tensor | None = None
+        self.last_write_gate: torch.Tensor | None = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        gate = torch.sigmoid(self.gate(x))
-        candidate = torch.tanh(self.candidate(x))
-        return gate * candidate + (1.0 - gate) * x
+        read_weights = torch.softmax(self.read_gate(x), dim=-1)
+        memory_read = read_weights @ self.memory_bank
+        write_gate = torch.sigmoid(self.write_gate(x))
+        candidate = torch.tanh(self.candidate(torch.cat([x, memory_read], dim=-1)))
+        self.last_read_weights = read_weights.detach()
+        self.last_write_gate = write_gate.detach()
+        return write_gate * candidate + (1.0 - write_gate) * x
 
 
 class ObjectBindingAdapter(nn.Module):
     """Bounded pairwise feature mixer for object/relation-like task features."""
 
-    def __init__(self, hidden_dim: int):
+    def __init__(self, hidden_dim: int, object_slots: int = 2):
         super().__init__()
+        self.object_slots = max(1, int(object_slots))
+        self.slot_dim = (hidden_dim + self.object_slots - 1) // self.object_slots
+        padded_dim = self.slot_dim * self.object_slots
+        self.pad_dim = padded_dim - hidden_dim
         self.query = nn.Linear(hidden_dim, hidden_dim)
         self.key = nn.Linear(hidden_dim, hidden_dim)
         self.value = nn.Linear(hidden_dim, hidden_dim)
         self.output = nn.Linear(hidden_dim, hidden_dim)
+        self.last_attention: torch.Tensor | None = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        q = self.query(x)
-        k = self.key(x)
-        v = self.value(x)
-        scale = max(1.0, float(q.shape[-1]) ** 0.5)
-        if x.ndim == 2:
-            scores = torch.softmax((q @ k.transpose(0, 1)) / scale, dim=-1)
-            mixed = scores @ v
-        else:
-            scores = torch.softmax((q @ k.transpose(-2, -1)) / scale, dim=-1)
-            mixed = scores @ v
+        q = self._to_slots(self.query(x))
+        k = self._to_slots(self.key(x))
+        v = self._to_slots(self.value(x))
+        scale = max(1.0, float(self.slot_dim) ** 0.5)
+        attention = torch.softmax((q @ k.transpose(-2, -1)) / scale, dim=-1)
+        mixed = (attention @ v).reshape(x.shape[0], -1)
+        if self.pad_dim:
+            mixed = mixed[:, :-self.pad_dim]
+        self.last_attention = attention.detach()
         return x + self.output(mixed)
+
+    def _to_slots(self, x: torch.Tensor) -> torch.Tensor:
+        if self.pad_dim:
+            x = torch.nn.functional.pad(x, (0, self.pad_dim))
+        return x.reshape(x.shape[0], self.object_slots, self.slot_dim)
 
 
 class SequenceStateAdapter(nn.Module):
     """Small recurrent-style state adapter over feature order within a batch."""
 
-    def __init__(self, hidden_dim: int):
+    def __init__(self, hidden_dim: int, sequence_chunks: int = 4):
         super().__init__()
-        self.update = nn.GRUCell(hidden_dim, hidden_dim)
-        self.mix = nn.Linear(hidden_dim, hidden_dim)
+        self.sequence_chunks = max(1, int(sequence_chunks))
+        self.chunk_dim = (hidden_dim + self.sequence_chunks - 1) // self.sequence_chunks
+        padded_dim = self.chunk_dim * self.sequence_chunks
+        self.pad_dim = padded_dim - hidden_dim
+        self.update = nn.GRUCell(self.chunk_dim, self.chunk_dim)
+        self.mix = nn.Linear(padded_dim, hidden_dim)
+        self.last_state_norm: float = 0.0
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if x.ndim != 2 or x.shape[0] <= 1:
-            return x + torch.tanh(self.mix(x))
-        state = torch.zeros_like(x[0])
+        padded = torch.nn.functional.pad(x, (0, self.pad_dim)) if self.pad_dim else x
+        chunks = padded.reshape(x.shape[0], self.sequence_chunks, self.chunk_dim)
+        state = torch.zeros(x.shape[0], self.chunk_dim, dtype=x.dtype, device=x.device)
         outputs = []
-        for row in x:
-            state = self.update(row, state)
+        for index in range(self.sequence_chunks):
+            state = self.update(chunks[:, index, :], state)
             outputs.append(state)
-        stacked = torch.stack(outputs, dim=0)
+        stacked = torch.stack(outputs, dim=1).reshape(x.shape[0], -1)
+        self.last_state_norm = float(stacked.detach().norm(dim=-1).mean())
         return x + torch.tanh(self.mix(stacked))
 
 
@@ -124,9 +148,13 @@ class CausalBottleneck(nn.Module):
         self.encoder = nn.Linear(hidden_dim, bottleneck_dim)
         self.decoder = nn.Linear(bottleneck_dim, hidden_dim)
         self.latent_gate = nn.Parameter(torch.zeros(bottleneck_dim))
+        self.last_latent: torch.Tensor | None = None
+        self.last_usage: float = 0.0
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         latent = torch.tanh(self.encoder(x)) * torch.sigmoid(self.latent_gate)
+        self.last_latent = latent.detach()
+        self.last_usage = float(latent.detach().abs().mean())
         return x + self.decoder(latent)
 
 
@@ -141,12 +169,12 @@ class NeuralArchitectureModule(nn.Module):
             ResidualMLPBlock(genome.hidden_dim, genome.activation, genome.dropout)
             for _ in range(genome.residual_blocks)
         )
-        self.memory_gates = nn.ModuleList(MemoryGate(genome.hidden_dim) for _ in range(genome.memory_gates))
+        self.memory_gates = nn.ModuleList(MemoryGate(genome.hidden_dim, genome.memory_slots) for _ in range(genome.memory_gates))
         self.object_binding_adapters = nn.ModuleList(
-            ObjectBindingAdapter(genome.hidden_dim) for _ in range(genome.object_binding_adapters)
+            ObjectBindingAdapter(genome.hidden_dim, genome.object_slots) for _ in range(genome.object_binding_adapters)
         )
         self.sequence_state_adapters = nn.ModuleList(
-            SequenceStateAdapter(genome.hidden_dim) for _ in range(genome.sequence_state_adapters)
+            SequenceStateAdapter(genome.hidden_dim, genome.sequence_chunks) for _ in range(genome.sequence_state_adapters)
         )
         self.causal_bottlenecks = nn.ModuleList(
             CausalBottleneck(genome.hidden_dim, genome.effective_bottleneck_dim)

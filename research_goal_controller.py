@@ -93,6 +93,9 @@ class BenchmarkEvidence:
         metrics = _numeric_metrics(result)
         if isinstance(metric_map, Mapping):
             metrics.update(_numeric_metrics(metric_map))
+        agi_metric_map = result.get("agi_relevance_metrics", {})
+        if isinstance(agi_metric_map, Mapping):
+            metrics.update(_numeric_metrics(agi_metric_map))
 
         benchmark = str(result.get("benchmark") or config_map.get("benchmark") or "unknown")
         mode = str(config_map.get("mode") or result.get("mode") or _infer_mode(source_path))
@@ -153,6 +156,11 @@ def infer_mechanism_tags(
         tags.add("exact_grid")
     if _metric(metrics, "baseline_to_evolved_loss_delta") is not None:
         tags.add("loss_improvement")
+    if "autonomous_neural_exploration" in lower or _metric(metrics, "cross_domain_transfer_score") is not None:
+        tags.add("neural_exploration")
+        tags.add("architecture_search")
+    if _metric(metrics, "deep_search_efficiency") is not None:
+        tags.add("deep_search")
     return tuple(sorted(tags))
 
 
@@ -170,6 +178,8 @@ def infer_limitations(
         limitations.append("not_official_arc_leaderboard")
     if "template" in lower or "humaneval_template" in lower:
         limitations.append("template_coding_harness")
+    if "autonomous_neural_exploration" in lower or "neural_exploration" in lower:
+        limitations.append("bounded_neural_search_only")
     return tuple(limitations)
 
 
@@ -420,6 +430,8 @@ class EvidenceGoalGenerator:
                 goals.extend(self._arc_goals(item))
             if "coding" in item.mechanism_tags or "template" in item.mechanism_tags:
                 goals.extend(self._coding_goals(item))
+            if "neural_exploration" in item.mechanism_tags:
+                goals.extend(self._neural_exploration_goals(item))
         for hypothesis in self.transfer_planner.plan(evidence):
             if hypothesis.similarity >= self.config.transfer_threshold:
                 goals.append(hypothesis.to_goal(self.config))
@@ -553,6 +565,58 @@ class EvidenceGoalGenerator:
                 expected_transfer_tags=("coding", "operator_program"),
             )
         ]
+
+    def _neural_exploration_goals(self, item: BenchmarkEvidence) -> List[ResearchGoal]:
+        metrics = item.metrics
+        goals: List[ResearchGoal] = []
+        transfer = _metric(metrics, "cross_domain_transfer_score") or 0.0
+        hidden_robustness = _metric(metrics, "hidden_validation_robustness") or 0.0
+        residue_resolution = _metric(metrics, "residue_resolution_rate") or 0.0
+        deep_efficiency = _metric(metrics, "deep_search_efficiency") or 0.0
+        goals.append(
+            ResearchGoal(
+                goal_id=_stable_id("goal", [item.evidence_id, "neural_hidden_transfer"]),
+                title=f"Improve hidden-validation transfer for neural exploration seed {item.seed}",
+                domain="deep_neural_autonomous_exploration",
+                target_metric="hidden_validation_robustness",
+                current_value=hidden_robustness,
+                target_value=min(1.0, max(hidden_robustness + 0.10, 0.35)),
+                priority=_clamp(self.config.gap_weight + 0.25 * (1.0 - hidden_robustness) + 0.15 * transfer),
+                feasible=True,
+                strategy="gap",
+                source_evidence_ids=(item.evidence_id,),
+                proposed_actions=(
+                    "Run the autonomous neural loop with hard task families and validation-only selection.",
+                    "Prioritize mutations that improve hidden-validation balance across task families.",
+                    "Evaluate heldout transfer only after the candidate architecture is frozen.",
+                ),
+                rationale="Autonomous neural exploration evidence is useful only if validation improvements survive hidden validation and transfer checks.",
+                expected_transfer_tags=("neural_exploration", "architecture_search", "deep_search"),
+            )
+        )
+        if residue_resolution < 0.75 or deep_efficiency < 0.25:
+            goals.append(
+                ResearchGoal(
+                    goal_id=_stable_id("goal", [item.evidence_id, "residue_resolution"]),
+                    title=f"Improve residue-guided deep search efficiency for seed {item.seed}",
+                    domain="deep_search_controller",
+                    target_metric="residue_resolution_rate",
+                    current_value=residue_resolution,
+                    target_value=min(1.0, max(residue_resolution + 0.15, 0.50)),
+                    priority=_clamp(self.config.frontier_weight + 0.20 * (1.0 - residue_resolution) + 0.15 * (1.0 - deep_efficiency)),
+                    feasible=True,
+                    strategy="frontier",
+                    source_evidence_ids=(item.evidence_id,),
+                    proposed_actions=(
+                        "Group persistent residues by module family and rollback reason.",
+                        "Increase search depth only when shallow mutations stop improving hidden validation.",
+                        "Record module-level credit assignment for accepted and rejected candidates.",
+                    ),
+                    rationale="Persistent residues and low deep-search efficiency indicate that mutation selection needs better credit assignment.",
+                    expected_transfer_tags=("deep_search", "failure_residue", "architecture_search"),
+                )
+            )
+        return goals
 
     def _creative_goals(self, evidence: Sequence[BenchmarkEvidence]) -> List[ResearchGoal]:
         tags = set(tag for item in evidence for tag in item.mechanism_tags)

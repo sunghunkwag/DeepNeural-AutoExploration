@@ -22,8 +22,10 @@ from evaluator_evolution import EvaluatorCandidate, adversarial_checks
 from failure_grammar import FailureGrammar
 from failure_residue import MissingOperatorInferencer, ResidueExtractor
 from meta_rsi.search_space_expander import SearchSpaceRegistry
+from self_model import architecture_decision_to_effects
 from neural_search import ArchitectureGenome
 from neural_search.agi_relevance_metrics import compute_agi_relevance_metrics
+from neural_search.deep_search_controller import DeepSearchController
 from neural_search.gradient_probe import gradient_failures_to_traces, probe_gradients
 from neural_search.multidomain_evaluator import MultiDomainEvaluator
 from neural_search.mutation_policy import MutationPolicy
@@ -48,6 +50,7 @@ def _mode_config(mode: str) -> Dict[str, int | float | str]:
             "generations": 1,
             "hidden_dim": 10,
             "mutation_policy": "residue_guided",
+            "difficulty": "hard",
         },
         "quick": {
             "samples_per_split": 18,
@@ -56,6 +59,7 @@ def _mode_config(mode: str) -> Dict[str, int | float | str]:
             "generations": 2,
             "hidden_dim": 12,
             "mutation_policy": "residue_guided",
+            "difficulty": "hard",
         },
     }[mode]
 
@@ -64,7 +68,11 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
     cfg = _mode_config(mode)
     output_path = Path(output or f"results/autonomous_neural_exploration_{mode}_seed{seed}.json")
     manifest_path = output_path.with_suffix(".manifest.json")
-    task_families = build_multidomain_task_families(seed=seed, samples_per_split=int(cfg["samples_per_split"]))
+    task_families = build_multidomain_task_families(
+        seed=seed,
+        samples_per_split=int(cfg["samples_per_split"]),
+        difficulty=str(cfg["difficulty"]),
+    )
     assert_disjoint_multidomain_splits(task_families)
 
     evaluator = MultiDomainEvaluator(seed=seed, train_steps=int(cfg["train_steps"]), lr=0.018)
@@ -73,7 +81,12 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
     current_eval = evaluator.train_and_validate(current_genome, task_families)
     base_eval = current_eval
 
-    representation_probe = probe_representations(current_eval.model, task_families, genome_id=current_genome.genome_id)
+    representation_probe = probe_representations(
+        current_eval.model,
+        task_families,
+        genome_id=current_genome.genome_id,
+        validation_hidden_mismatch=_validation_hidden_mismatch(current_eval),
+    )
     gradient_probe = probe_gradients(current_eval.model, task_families, genome_id=current_genome.genome_id)
     extractor = ResidueExtractor()
     residue_traces = []
@@ -99,6 +112,7 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
     search_space_updates = registry.update_from_hypotheses(hypotheses, residues)
     history = SearchHistory()
     policy = MutationPolicy(str(cfg["mutation_policy"]), seed=seed)
+    deep_controller = DeepSearchController(seed=seed)
     failure_grammar = FailureGrammar()
 
     architecture_decisions: List[Dict[str, object]] = []
@@ -106,36 +120,192 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
     mutation_proposals: List[Dict[str, object]] = []
     inheritance_reports: List[Dict[str, object]] = []
     candidate_failure_traces: List[Dict[str, object]] = []
+    generation_candidate_table: List[Dict[str, object]] = []
+    deep_search_decisions: List[Dict[str, object]] = []
+    mutation_policy_rationale: List[Dict[str, object]] = []
+    search_depth_by_generation: List[Dict[str, object]] = []
+    probe_results_before: List[Dict[str, object]] = [representation_probe.to_dict()]
+    gradient_probe_results_before: List[Dict[str, object]] = [gradient_probe.to_dict()]
+    probe_results_after_accepted: List[Dict[str, object]] = []
+    gradient_probe_results_after_accepted: List[Dict[str, object]] = []
+    failure_residues_before = [residue.to_dict() for residue in residues]
+    failure_residues_after_accepted: List[Dict[str, object]] = []
+    selection_score_components: List[Dict[str, object]] = []
+    rollback_reasons: List[Dict[str, object]] = []
+    module_credit_assignment: List[Dict[str, object]] = []
     rollback_count = 0
 
     for generation in range(int(cfg["generations"])):
-        proposals = policy.propose(current_genome, residues=residues, history=history, count=int(cfg["candidate_count"]))
+        if generation > 0:
+            representation_probe = probe_representations(
+                current_eval.model,
+                task_families,
+                genome_id=current_genome.genome_id,
+                validation_hidden_mismatch=_validation_hidden_mismatch(current_eval),
+            )
+            gradient_probe = probe_gradients(current_eval.model, task_families, genome_id=current_genome.genome_id)
+            probe_results_before.append(representation_probe.to_dict())
+            gradient_probe_results_before.append(gradient_probe.to_dict())
+            residues = _append_unique_residues(
+                residues,
+                extractor.extract_many(
+                    representation_failures_to_traces(
+                        representation_probe,
+                        benchmark_name="autonomous_neural_exploration",
+                        seed=seed,
+                    )
+                    + gradient_failures_to_traces(
+                        gradient_probe,
+                        benchmark_name="autonomous_neural_exploration",
+                        seed=seed,
+                    )
+                ),
+            )
+        hypotheses = inferencer.infer(residues)
+        search_space_updates.update(registry.update_from_hypotheses(hypotheses, residues))
+        deep_output = deep_controller.decide(
+            current_genome,
+            residues=residues,
+            history=history,
+            representation_probe=representation_probe,
+            gradient_probe=gradient_probe,
+            search_space_registry=registry,
+            generation=generation,
+        )
+        deep_decision = deep_output.decision
+        deep_search_decisions.append({"generation": generation, **deep_decision.to_dict()})
+        search_depth_by_generation.append(
+            {
+                "generation": generation,
+                "selected_depth_level": deep_decision.selected_depth_level,
+                "rollback_risk": deep_decision.rollback_risk,
+                "complexity_penalty": deep_decision.complexity_penalty,
+                "rationale": deep_decision.rationale,
+            }
+        )
+        module_credit_assignment.append({"generation": generation, **deep_output.credit_report.to_dict()})
+        proposals = policy.propose(
+            current_genome,
+            residues=residues,
+            history=history,
+            deep_search_decision=deep_decision,
+            credit_report=deep_output.credit_report,
+            count=int(cfg["candidate_count"]),
+        )
         for proposal_index, proposal in enumerate(proposals):
             parent_before = current_genome
+            parent_eval_before = current_eval
+            parent_representation_probe = representation_probe
+            parent_gradient_probe = gradient_probe
             candidate = proposal.candidate
             candidate_genomes.append(candidate.to_dict())
             mutation_proposals.append(proposal.to_dict())
+            mutation_policy_rationale.append(
+                {
+                    "generation": generation,
+                    "proposal_index": proposal_index,
+                    "candidate_id": candidate.genome_id,
+                    "method": proposal.method,
+                    "policy": proposal.policy,
+                    "reason": proposal.reason,
+                    "deep_search_decision_id": deep_decision.decision_id,
+                }
+            )
             candidate_model = candidate.build_module()
             inheritance = inherit_shape_compatible_weights(current_eval.model, candidate_model)
             candidate_eval = evaluator.train_and_validate(candidate, task_families, initial_model=candidate_model)
-            decision = evaluator.selection_decision(current_genome, candidate, current_eval, candidate_eval)
+            candidate_representation_probe = probe_representations(
+                candidate_eval.model,
+                task_families,
+                genome_id=candidate.genome_id,
+                validation_hidden_mismatch=_validation_hidden_mismatch(candidate_eval),
+            )
+            candidate_gradient_probe = probe_gradients(candidate_eval.model, task_families, genome_id=candidate.genome_id)
+            decision = evaluator.selection_decision(
+                current_genome,
+                candidate,
+                current_eval,
+                candidate_eval,
+                parent_representation_probe=parent_representation_probe,
+                candidate_representation_probe=candidate_representation_probe,
+                parent_gradient_probe=parent_gradient_probe,
+                candidate_gradient_probe=candidate_gradient_probe,
+                rollback_risk=deep_decision.rollback_risk,
+                module_contribution_score=deep_output.credit_report.module_contribution_score,
+            )
             decision_dict = decision.to_dict()
             decision_dict["generation"] = generation
+            decision_dict["proposal_index"] = proposal_index
             decision_dict["proposal_reason"] = proposal.reason
             decision_dict["weight_inheritance"] = inheritance.to_dict()
+            decision_dict["deep_search_decision_id"] = deep_decision.decision_id
+            decision_dict["mutation_policy_rationale"] = proposal.reason
+            decision_dict["candidate_representation_probe"] = candidate_representation_probe.to_dict()
+            decision_dict["candidate_gradient_probe"] = candidate_gradient_probe.to_dict()
             architecture_decisions.append(decision_dict)
+            selection_score_components.append(
+                {
+                    "generation": generation,
+                    "candidate_id": candidate.genome_id,
+                    "components": decision.selection_score_components,
+                    "parent_selection_score": decision.parent_selection_score,
+                    "candidate_selection_score": decision.candidate_selection_score,
+                    "selection_score_delta": decision.selection_score_delta,
+                }
+            )
+            generation_candidate_table.append(
+                {
+                    "generation": generation,
+                    "candidate_id": candidate.genome_id,
+                    "parent_id": parent_before.genome_id,
+                    "mutation_method": proposal.method,
+                    "accepted": decision.accepted,
+                    "rollback": decision.rollback,
+                    "validation_improvement": decision.validation_improvement,
+                    "hidden_validation_improvement": decision.hidden_validation_improvement,
+                    "selection_score_delta": decision.selection_score_delta,
+                    "rejection_reason": decision.rejection_reason,
+                }
+            )
             inheritance_reports.append(inheritance.to_dict())
             failure_residue_ids: List[str] = []
             if decision.accepted:
                 current_genome = candidate
                 current_eval = candidate_eval
+                representation_probe = candidate_representation_probe
+                gradient_probe = candidate_gradient_probe
+                probe_results_after_accepted.append(candidate_representation_probe.to_dict())
+                gradient_probe_results_after_accepted.append(candidate_gradient_probe.to_dict())
+                accepted_probe_residues = extractor.extract_many(
+                    representation_failures_to_traces(
+                        candidate_representation_probe,
+                        benchmark_name="autonomous_neural_exploration",
+                        seed=seed,
+                    )
+                    + gradient_failures_to_traces(
+                        candidate_gradient_probe,
+                        benchmark_name="autonomous_neural_exploration",
+                        seed=seed,
+                    )
+                )
+                residues = _append_unique_residues(residues, accepted_probe_residues)
+                failure_residues_after_accepted.extend(residue.to_dict() for residue in accepted_probe_residues)
             else:
                 rollback_count += 1
                 trace = _decision_to_failure_trace(decision_dict, seed=seed, generation=generation)
                 candidate_failure_traces.append(trace)
                 residue = extractor.extract(trace)
-                residues.append(residue)
+                residues = _append_unique_residues(residues, [residue])
                 failure_residue_ids.append(residue.residue_id)
+                rollback_reasons.append(
+                    {
+                        "generation": generation,
+                        "candidate_id": candidate.genome_id,
+                        "reason": decision.rejection_reason,
+                        "selection_score_delta": decision.selection_score_delta,
+                        "task_family_regressions": decision.task_family_regressions,
+                    }
+                )
             history.add(
                 parent=parent_before,
                 candidate=candidate,
@@ -145,6 +315,13 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
                 accepted=decision.accepted,
                 failure_residue_ids=failure_residue_ids,
                 seed=candidate.seed,
+                validation_improvement=decision.validation_improvement,
+                hidden_validation_improvement=decision.hidden_validation_improvement,
+                cross_domain_transfer_delta=candidate_eval.cross_domain_transfer_score - parent_eval_before.cross_domain_transfer_score,
+                rollback_reason="" if decision.accepted else decision.rejection_reason,
+                task_family_improvements=_task_family_improvements(parent_eval_before, candidate_eval),
+                selection_score_components=decision.selection_score_components,
+                deep_search_decision_id=deep_decision.decision_id,
             )
         hypotheses = inferencer.infer(residues)
         search_space_updates.update(registry.update_from_hypotheses(hypotheses, residues))
@@ -155,6 +332,7 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
         "selection_split": "validation+hidden_validation",
         "heldout_test_evaluated_before_freeze": False,
     }
+    heldout_evaluation_timestamp = datetime.now(timezone.utc).isoformat()
     final_heldout = evaluator.evaluate_heldout_after_freeze(current_eval.model, current_genome, task_families)
     base_heldout = evaluator.evaluate_heldout_after_freeze(base_eval.model, base_genome, task_families)
     accepted = [decision for decision in architecture_decisions if decision["accepted"]]
@@ -177,6 +355,8 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
         "heldout_test_after_freeze": 1.0,
         "mutation_policy_improvement_over_random": _policy_improvement_proxy(architecture_decisions),
     }
+    final_bottleneck_diagnosis = _final_bottleneck_diagnosis(residues)
+    recommended_next_experiment = _recommended_next_experiment(registry, deep_search_decisions, residues)
     result = {
         "benchmark": "autonomous_neural_exploration",
         "mode": mode,
@@ -186,29 +366,49 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
         "final_genome": current_genome.to_dict(),
         "candidate_genomes": candidate_genomes,
         "mutation_policy": {"policy": policy.policy, "seed": policy.seed, "proposals": mutation_proposals},
+        "mutation_policy_rationale": mutation_policy_rationale,
         "search_space_expansions": list(search_space_updates.values()),
         "failure_residues": [residue.to_dict() for residue in residues],
         "representation_probe_results": representation_probe.to_dict(),
         "gradient_probe_results": gradient_probe.to_dict(),
+        "probe_results_before": probe_results_before,
+        "gradient_probe_results_before": gradient_probe_results_before,
+        "probe_results_after_accepted": probe_results_after_accepted,
+        "gradient_probe_results_after_accepted": gradient_probe_results_after_accepted,
         "architecture_decisions": architecture_decisions,
+        "generation_candidate_table": generation_candidate_table,
+        "deep_search_decisions": deep_search_decisions,
+        "search_depth_by_generation": search_depth_by_generation,
         "accepted_candidates": accepted,
         "rejected_candidates": rejected,
         "rollback_count": rollback_count,
+        "rollback_reasons": rollback_reasons,
+        "selection_score_components": selection_score_components,
+        "module_credit_assignment": module_credit_assignment,
+        "failure_residues_before": failure_residues_before,
+        "failure_residues_after_accepted": failure_residues_after_accepted,
         "validation_metrics": {"loss": current_eval.validation_loss, **current_eval.validation_loss_by_family},
         "hidden_validation_metrics": {"loss": current_eval.hidden_validation_loss, **current_eval.hidden_validation_loss_by_family},
         "heldout_test_metrics_after_freeze": final_heldout.to_dict(),
+        "heldout_evaluation_timestamp_after_freeze": heldout_evaluation_timestamp,
         "base_metrics": base_heldout.to_dict(),
         "final_metrics": final_heldout.to_dict(),
         "metrics": metrics,
+        "final_bottleneck_diagnosis": final_bottleneck_diagnosis,
+        "recommended_next_experiment": recommended_next_experiment,
         "search_history": history.to_dict(),
         "failure_grammar": failure_grammar.to_dict(),
         "evaluator_evolution_inputs": evaluator_checks,
-        "self_model_candidate_effects": [_self_model_effects(decision) for decision in architecture_decisions],
+        "self_model_candidate_effects": [architecture_decision_to_effects(decision) for decision in architecture_decisions],
         "research_goal_controller_input": {
             "benchmark": "autonomous_neural_exploration",
             "mode": mode,
             "seed": seed,
             "metrics": metrics,
+            "final_bottleneck_diagnosis": final_bottleneck_diagnosis,
+            "recommended_next_experiment": recommended_next_experiment,
+            "persistent_residue_types": _persistent_residue_types(residues),
+            "search_space_expansions": list(search_space_updates.values()),
             "scope": "bounded_neural_architecture_search",
         },
         "task_families": serializable_task_families(task_families),
@@ -217,11 +417,26 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
         "audit_trail": {
             "weight_inheritance": inheritance_reports,
             "candidate_failure_traces": candidate_failure_traces,
+            "generation_candidate_table": generation_candidate_table,
+            "deep_search_decisions": deep_search_decisions,
+            "mutation_policy_rationale": mutation_policy_rationale,
+            "search_depth_by_generation": search_depth_by_generation,
+            "probe_results_before": probe_results_before,
+            "probe_results_after_accepted": probe_results_after_accepted,
+            "failure_residues_before": failure_residues_before,
+            "failure_residues_after_accepted": failure_residues_after_accepted,
+            "selection_score_components": selection_score_components,
+            "rollback_reasons": rollback_reasons,
+            "module_credit_assignment": module_credit_assignment,
+            "heldout_evaluation_timestamp_after_freeze": heldout_evaluation_timestamp,
+            "final_bottleneck_diagnosis": final_bottleneck_diagnosis,
+            "recommended_next_experiment": recommended_next_experiment,
             "heldout_test_evaluated_after_freeze": True,
             "used_heldout_labels_for_selection": False,
         },
     }
     result["agi_relevance_metrics"] = compute_agi_relevance_metrics(result)
+    result["research_goal_controller_input"]["agi_relevance_metrics"] = result["agi_relevance_metrics"]  # type: ignore[index]
     manifest = _build_manifest(result, cfg, seed, mode, output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
@@ -229,6 +444,88 @@ def run(mode: str, seed: int, output: str | None = None) -> Dict[str, object]:
     result["manifest_path"] = str(manifest_path)
     output_path.write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
     return result
+
+
+def _validation_hidden_mismatch(evaluation) -> float:
+    return float(max(0.0, evaluation.hidden_validation_loss - evaluation.validation_loss) / (1.0 + evaluation.validation_loss))
+
+
+def _append_unique_residues(existing, new_residues):
+    seen = {residue.residue_id for residue in existing}
+    out = list(existing)
+    for residue in new_residues:
+        if residue.residue_id not in seen:
+            out.append(residue)
+            seen.add(residue.residue_id)
+    return out
+
+
+def _task_family_improvements(parent_eval, candidate_eval) -> Dict[str, float]:
+    values: Dict[str, float] = {}
+    for family, parent_loss in parent_eval.hidden_validation_loss_by_family.items():
+        if family in candidate_eval.hidden_validation_loss_by_family:
+            values[family] = float(parent_loss - candidate_eval.hidden_validation_loss_by_family[family])
+    return values
+
+
+def _persistent_residue_types(residues) -> List[str]:
+    counts: Dict[str, int] = {}
+    for residue in residues:
+        counts[residue.failure_type] = counts.get(residue.failure_type, 0) + 1
+    return sorted(name for name, count in counts.items() if count >= 2)
+
+
+def _final_bottleneck_diagnosis(residues) -> Dict[str, object]:
+    counts: Dict[str, int] = {}
+    families: Dict[str, int] = {}
+    for residue in residues:
+        counts[residue.failure_type] = counts.get(residue.failure_type, 0) + 1
+        family = residue.proposed_operator_or_module_family
+        families[family] = families.get(family, 0) + 1
+    if not counts:
+        return {"primary_failure_type": "none", "support_count": 0, "proposed_module_family": "none"}
+    primary = max(sorted(counts), key=lambda key: counts[key])
+    proposed = max(sorted(families), key=lambda key: families[key]) if families else "bounded search-space review"
+    return {
+        "primary_failure_type": primary,
+        "support_count": counts[primary],
+        "proposed_module_family": proposed,
+        "persistent_residue_types": _persistent_residue_types(residues),
+    }
+
+
+def _recommended_next_experiment(registry: SearchSpaceRegistry, deep_search_decisions: Sequence[Dict[str, object]], residues) -> Dict[str, object]:
+    families = registry.to_dict().get("module_families", {})
+    if isinstance(families, dict) and families:
+        best_name, best_entry = max(
+            families.items(),
+            key=lambda item: float(item[1].get("confidence_score", 0.0)) if isinstance(item[1], dict) else 0.0,
+        )
+        if isinstance(best_entry, dict):
+            return {
+                "action": "expand_or_prioritize_module_family",
+                "module_family": best_name,
+                "recommended_mutation_operators": list(best_entry.get("recommended_mutation_operators", [])),
+                "confidence_score": float(best_entry.get("confidence_score", 0.0)),
+                "reason": best_entry.get("bounded_rationale", ""),
+                "used_heldout_labels": False,
+            }
+    if deep_search_decisions:
+        latest = deep_search_decisions[-1]
+        return {
+            "action": "continue_deep_search",
+            "selected_depth_level": latest.get("selected_depth_level", 1),
+            "recommended_mutation_operators": latest.get("selected_mutation_methods", []),
+            "reason": latest.get("rationale", ""),
+            "used_heldout_labels": False,
+        }
+    diagnosis = _final_bottleneck_diagnosis(residues)
+    return {
+        "action": "collect_more_validation_residue",
+        "primary_failure_type": diagnosis["primary_failure_type"],
+        "recommended_mutation_operators": ["add_residual_block"],
+        "used_heldout_labels": False,
+    }
 
 
 def _decision_to_failure_trace(decision: Dict[str, object], *, seed: int, generation: int) -> Dict[str, object]:
@@ -319,10 +616,20 @@ def _build_manifest(
         "base_genome": result["base_genome"],
         "candidate_genomes": result["candidate_genomes"],
         "mutation_policy": result["mutation_policy"],
+        "mutation_policy_rationale": result["mutation_policy_rationale"],
         "search_space_expansions": result["search_space_expansions"],
         "failure_residues": result["failure_residues"],
         "representation_probe_results": result["representation_probe_results"],
         "gradient_probe_results": result["gradient_probe_results"],
+        "deep_search_decisions": result["deep_search_decisions"],
+        "generation_candidate_table": result["generation_candidate_table"],
+        "selection_score_components": result["selection_score_components"],
+        "rollback_reasons": result["rollback_reasons"],
+        "module_credit_assignment": result["module_credit_assignment"],
+        "heldout_evaluation_timestamp_after_freeze": result["heldout_evaluation_timestamp_after_freeze"],
+        "final_bottleneck_diagnosis": result["final_bottleneck_diagnosis"],
+        "recommended_next_experiment": result["recommended_next_experiment"],
+        "research_goal_controller_input": result["research_goal_controller_input"],
         "accepted_candidates": result["accepted_candidates"],
         "rejected_candidates": result["rejected_candidates"],
         "rollback_count": result["rollback_count"],
