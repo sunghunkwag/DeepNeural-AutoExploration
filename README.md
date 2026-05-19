@@ -22,7 +22,7 @@ Current full regression check:
 
 ```bash
 python -m pytest -q
-# 239 passed
+# 259 passed
 ```
 
 The autonomous neural exploration loop now includes an evidence-guided deep search layer and a post-freeze meta-meta-meta search controller. The deep search layer uses failure residues, representation and gradient probes, validation/hidden-validation trends, rollback reasons, architecture complexity, and module contribution signals to select bounded mutation depth and mutation families. The meta-meta-meta layer diagnoses the search process itself, proposes bounded next-run search/evaluator/curriculum config changes, runs the next experiment, attributes which config changes likely helped or harmed, evaluates decision quality, records bounded JSON config memory, and emits explicit next-run trust/revise/revert recommendations. Candidate selection remains validation/hidden-validation gated, and held-out test labels are evaluated only after candidate freeze.
@@ -104,6 +104,16 @@ python benchmarks/meta_meta_meta_search_benchmark.py --mode smoke --seed 42
 
 The meta-meta-meta benchmark writes first-run and second-run outputs, the applied next-run config, strict process-improvement components, config-change attribution, meta-decision quality, estimated counterfactual reports, a bounded meta-config memory JSON file, and a manifest with anti-cheat checks.
 
+Long-horizon autonomous neural exploration and memory ablation:
+
+```bash
+python benchmarks/long_horizon_autonomous_exploration.py --mode full --seed 42 --runs 10
+python benchmarks/memory_ablation_long_horizon.py --mode full --seeds 42,43,44 --runs 10
+python benchmarks/external_neural_adapter_benchmark.py --mode full --seed 42
+```
+
+The long-horizon repair path reports rollback-risk budgets, rollback causes, residue lifecycle state, evaluator calibration repairs, memory-guided versus memory-disabled comparison, and conservative external heldout-after-freeze acceptance. Current multi-seed evidence is mixed: evaluator-overfit risk improved on average, but rollback rate, residue resolution, hidden-validation robustness, and external heldout-after-freeze did not satisfy the success criteria.
+
 Other runnable entry points:
 
 ```bash
@@ -160,6 +170,9 @@ pip install pytest
 - [Research-goal generation integration](docs/research_goal_generation_integration.md)
 - [Next architecture upgrade plan](docs/next_architecture_upgrade_plan.md)
 - [Deep neural autonomous exploration upgrade](docs/deep_neural_autonomous_exploration_upgrade.md)
+- [Long-horizon autonomous exploration report](docs/long_horizon_autonomous_exploration_report.md)
+- [Long-horizon seed-42 failure analysis](docs/long_horizon_failure_analysis_seed42.md)
+- [Long-horizon repair and memory ablation report](docs/long_horizon_repair_and_ablation_report.md)
 - [ARC seed-44 failure residue report](docs/arc_seed44_failure_residue_report.md)
 - [Interaction operating scaffold](docs/interaction_operating_scaffold.md)
 - [Interaction residue layer](docs/interaction_residue_layer.md)

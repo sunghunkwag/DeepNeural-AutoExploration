@@ -1,5 +1,5 @@
 from neural_search import ArchitectureGenome
-from neural_search.multidomain_evaluator import MultiDomainEvaluator, selection_score_components
+from neural_search.multidomain_evaluator import MultiDomainEvaluation, MultiDomainEvaluator, selection_score_components
 from neural_search.task_families import build_multidomain_task_families
 
 
@@ -46,4 +46,79 @@ def test_selection_score_penalizes_complexity_and_rollback_risk():
     compact_score = selection_score_components(compact, compact_eval)["selection_score"]
     risky_score = selection_score_components(complex_genome, compact_eval, rollback_risk=1.0)["selection_score"]
     assert risky_score < compact_score
+
+
+def test_selection_accepts_hidden_positive_candidate_despite_over_penalized_score():
+    parent = ArchitectureGenome(input_dim=4, output_dim=2, hidden_dim=8, seed=601)
+    candidate = parent.with_updates(hidden_dim=10, mutation_method="widen_hidden_dim", seed=602)
+    families = {
+        "function_regression": 1.01,
+        "sequence_prediction": 1.01,
+        "object_state_transition": 1.01,
+        "causal_intervention": 0.90,
+        "memory_retrieval": 0.90,
+    }
+    parent_eval = MultiDomainEvaluation(
+        genome_id=parent.genome_id,
+        train_loss_by_family={key: 1.0 for key in families},
+        validation_loss_by_family={key: 1.0 for key in families},
+        hidden_validation_loss_by_family={key: 1.0 for key in families},
+        cross_domain_transfer_score=0.5,
+    )
+    candidate_eval = MultiDomainEvaluation(
+        genome_id=candidate.genome_id,
+        train_loss_by_family={key: 1.0 for key in families},
+        validation_loss_by_family={key: 0.99 for key in families},
+        hidden_validation_loss_by_family=families,
+        cross_domain_transfer_score=0.5,
+    )
+
+    decision = MultiDomainEvaluator(seed=601, train_steps=1).selection_decision(
+        parent,
+        candidate,
+        parent_eval,
+        candidate_eval,
+        rollback_risk=1.0,
+    )
+
+    assert decision.accepted is True
+    assert decision.rejection_reason == "accepted_hidden_validation_calibrated"
+    assert decision.selection_score_components["calibration_hidden_validation_acceptance_flag"] == 1.0
+
+
+def test_selection_accepts_strong_hidden_gain_with_small_validation_tradeoff():
+    parent = ArchitectureGenome(input_dim=4, output_dim=2, hidden_dim=8, seed=611)
+    candidate = parent.with_updates(causal_bottlenecks=1, mutation_method="add_causal_bottleneck", seed=612)
+    families = {
+        "function_regression": 0.95,
+        "sequence_prediction": 0.96,
+        "object_state_transition": 0.97,
+        "causal_intervention": 0.98,
+        "memory_retrieval": 0.99,
+    }
+    parent_eval = MultiDomainEvaluation(
+        genome_id=parent.genome_id,
+        train_loss_by_family={key: 1.0 for key in families},
+        validation_loss_by_family={key: 1.0 for key in families},
+        hidden_validation_loss_by_family={key: 1.0 for key in families},
+        cross_domain_transfer_score=0.5,
+    )
+    candidate_eval = MultiDomainEvaluation(
+        genome_id=candidate.genome_id,
+        train_loss_by_family={key: 1.0 for key in families},
+        validation_loss_by_family={key: 1.009 for key in families},
+        hidden_validation_loss_by_family=families,
+        cross_domain_transfer_score=0.5,
+    )
+
+    decision = MultiDomainEvaluator(seed=611, train_steps=1).selection_decision(
+        parent,
+        candidate,
+        parent_eval,
+        candidate_eval,
+        rollback_risk=1.0,
+    )
+
+    assert decision.accepted is True
+    assert decision.rejection_reason == "accepted_hidden_validation_calibrated"
 

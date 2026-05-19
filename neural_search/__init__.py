@@ -9,12 +9,18 @@ from .architecture_genome import ArchitectureGenome
 from .architecture_evaluator import ArchitectureDecision, ArchitectureEvaluator
 from .agi_relevance_metrics import compute_agi_relevance_metrics
 from .deep_search_controller import DeepSearchController, DeepSearchDecision
+from .evaluator_evolution_adapter import EvaluatorEvolutionEvidenceAdapter
+from .external_task_adapters import build_external_task_families
+from .long_horizon_trend_analysis import compute_long_horizon_trends
+from .long_horizon_failure_diagnosis import FailureDiagnosisReport, diagnose_long_horizon_failure
 from .meta_config_attribution import ConfigChangeAttributionReport, ConfigChangeRecord, MetaConfigAttribution
 from .meta_config_memory import MetaConfigMemory
 from .meta_decision_quality import MetaDecisionQualityEvaluator, MetaDecisionQualityReport
+from .meta_memory_effectiveness import evaluate_meta_memory_effectiveness
 from .meta_meta_meta_controller import MetaMetaMetaController, MetaMetaMetaDecision
 from .next_run_config import NextRunConfig
 from .search_process_model import SearchProcessDiagnosis, SearchProcessModel
+from .self_model_adapter import LongHorizonSelfModelAdapter
 from .gradient_probe import GradientProbeResult, probe_gradients
 from .mutation_operators import MUTATION_METHODS, ArchitectureMutator, mutate_architecture
 from .mutation_policy import MutationPolicy, MutationProposal
@@ -41,6 +47,13 @@ __all__ = [
     "MetaConfigMemory",
     "MetaDecisionQualityEvaluator",
     "MetaDecisionQualityReport",
+    "compute_long_horizon_trends",
+    "FailureDiagnosisReport",
+    "diagnose_long_horizon_failure",
+    "evaluate_meta_memory_effectiveness",
+    "LongHorizonSelfModelAdapter",
+    "EvaluatorEvolutionEvidenceAdapter",
+    "build_external_task_families",
     "GradientProbeResult",
     "MUTATION_METHODS",
     "MultiDomainBatch",

@@ -42,7 +42,7 @@ class NextRunConfig:
         if not payload:
             return cls()
         mode = str(payload.get("recommended_mode", "smoke"))
-        if mode not in {"smoke", "quick"}:
+        if mode not in {"smoke", "quick", "full"}:
             mode = "smoke"
         seed_policy = str(payload.get("recommended_seed_policy", "same_seed"))
         if seed_policy not in {"same_seed", "next_seed"}:
