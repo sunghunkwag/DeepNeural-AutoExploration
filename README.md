@@ -22,10 +22,10 @@ Current full regression check:
 
 ```bash
 python -m pytest -q
-# 218 passed
+# 230 passed
 ```
 
-The autonomous neural exploration loop now includes an evidence-guided deep search layer. It uses failure residues, representation and gradient probes, validation/hidden-validation trends, rollback reasons, architecture complexity, and module contribution signals to select bounded mutation depth and mutation families. Candidate selection remains validation/hidden-validation gated, and held-out test labels are evaluated only after candidate freeze.
+The autonomous neural exploration loop now includes an evidence-guided deep search layer and a post-freeze meta-meta-meta search controller. The deep search layer uses failure residues, representation and gradient probes, validation/hidden-validation trends, rollback reasons, architecture complexity, and module contribution signals to select bounded mutation depth and mutation families. The meta-meta-meta layer diagnoses the search process itself and proposes bounded next-run search, evaluator, and curriculum config changes. Candidate selection remains validation/hidden-validation gated, and held-out test labels are evaluated only after candidate freeze.
 
 ## Main Components
 
@@ -40,7 +40,7 @@ The autonomous neural exploration loop now includes an evidence-guided deep sear
 - `failure_grammar.py`: rejected-candidate rules reused in later generations.
 - `evaluator_evolution.py`: probationary evaluator mutation under adversarial checks.
 - `research_goal_controller.py`: benchmark-evidence to research-goal generation and meta-meta goal-policy search.
-- `neural_search/`: explicit architecture genomes, deterministic bounded mutations, weight inheritance, harder multi-domain task families, representation/gradient probes, deep search depth scheduling, mutation credit assignment, mutation policies, search history, and validation-only neural candidate evaluation.
+- `neural_search/`: explicit architecture genomes, deterministic bounded mutations, weight inheritance, harder multi-domain task families, representation/gradient probes, deep search depth scheduling, mutation credit assignment, mutation policies, search history, post-freeze search-process diagnosis, bounded next-run config mutation, and validation-only neural candidate evaluation.
 - `failure_residue/`: structured failure residue extraction with held-out leakage refusal and missing-module inference.
 - `world_model_v2/`: object-centric state, causal graph, intervention, counterfactual rollout, and uncertainty decomposition utilities.
 - `meta_rsi/`: higher-level bounded orchestration over residues, neural search candidates, search-space registry updates, experiment plans, evaluator repair proposals, and audit reports.
@@ -94,6 +94,12 @@ Autonomous neural exploration loop:
 ```bash
 python benchmarks/autonomous_neural_exploration_loop.py --mode smoke --seed 42
 python benchmarks/autonomous_neural_exploration_loop.py --mode quick --seed 42
+```
+
+Meta-meta-meta search-process control:
+
+```bash
+python benchmarks/meta_meta_meta_search_benchmark.py --mode smoke --seed 42
 ```
 
 Other runnable entry points:
