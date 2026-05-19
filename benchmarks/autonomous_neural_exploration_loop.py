@@ -30,6 +30,7 @@ from neural_search.deep_search_controller import DeepSearchController
 from neural_search.gradient_probe import gradient_failures_to_traces, probe_gradients
 from neural_search.meta_meta_meta_controller import MetaMetaMetaController
 from neural_search.multidomain_evaluator import MultiDomainEvaluator
+from neural_search.mutation_operators import MUTATION_METHODS
 from neural_search.mutation_policy import MutationPolicy
 from neural_search.next_run_config import NextRunConfig
 from neural_search.representation_probe import probe_representations, representation_failures_to_traces
@@ -42,6 +43,19 @@ from neural_search.task_families import (
 )
 from neural_search.weight_inheritance import inherit_shape_compatible_weights
 from experiment_manifest import current_git_commit, stable_config_hash
+
+PROBATION_METHOD_ORDER = [
+    "repair_bottleneck",
+    "sequence_state_adapter",
+    "object_binding_adapter",
+    "add_causal_bottleneck",
+    "add_memory_gate",
+    "add_residual_block",
+    "narrow_hidden_dim",
+    "widen_hidden_dim",
+    "wider_residual_stack",
+    "remove_residual_block",
+]
 
 
 def _mode_config(mode: str) -> Dict[str, int | float | str]:
@@ -57,6 +71,15 @@ def _mode_config(mode: str) -> Dict[str, int | float | str]:
         },
         "quick": {
             "samples_per_split": 18,
+            "train_steps": 10,
+            "candidate_count": 4,
+            "generations": 2,
+            "hidden_dim": 12,
+            "mutation_policy": "residue_guided",
+            "difficulty": "hard",
+        },
+        "full": {
+            "samples_per_split": 20,
             "train_steps": 10,
             "candidate_count": 4,
             "generations": 2,
@@ -513,12 +536,36 @@ def _apply_strategy_config_to_methods(methods: Sequence[str], config) -> List[st
         penalties = {}
     if not isinstance(boosts, dict):
         boosts = {}
+    all_known_penalized = all(float(penalties.get(method, 0.0)) >= 0.95 for method in MUTATION_METHODS)
+    no_active_boost = not any(float(value) > 0.0 for value in boosts.values() if isinstance(value, (int, float)))
+    if all_known_penalized and no_active_boost:
+        return [method for method in PROBATION_METHOD_ORDER if method in MUTATION_METHODS]
+    expanded = list(methods)
+    expanded.extend(
+        method
+        for method, _boost in sorted(boosts.items(), key=lambda item: float(item[1]) if isinstance(item[1], (int, float)) else 0.0, reverse=True)
+        if method in MUTATION_METHODS
+    )
+    expanded.extend(method for method in MUTATION_METHODS if method not in expanded)
     ranked = sorted(
-        list(methods),
+        _dedupe_methods(expanded),
         key=lambda method: float(boosts.get(method, 0.0)) - float(penalties.get(method, 0.0)),
         reverse=True,
     )
-    return ranked or list(methods)
+    viable = [
+        method
+        for method in ranked
+        if float(penalties.get(method, 0.0)) < 0.95 or float(boosts.get(method, 0.0)) > 0.0
+    ]
+    return viable or ranked or list(methods)
+
+
+def _dedupe_methods(methods: Sequence[str]) -> List[str]:
+    out: List[str] = []
+    for method in methods:
+        if method in MUTATION_METHODS and method not in out:
+            out.append(method)
+    return out
 
 
 def _validation_hidden_mismatch(evaluation) -> float:
@@ -737,7 +784,7 @@ def _build_manifest(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Closed autonomous neural exploration loop")
-    parser.add_argument("--mode", choices=["smoke", "quick"], default="smoke")
+    parser.add_argument("--mode", choices=["smoke", "quick", "full"], default="smoke")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output", type=str, default=None)
     parser.add_argument("--next-run-config", type=str, default=None)

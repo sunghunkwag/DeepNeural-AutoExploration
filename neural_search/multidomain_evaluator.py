@@ -244,16 +244,42 @@ class MultiDomainEvaluator:
         score_delta = candidate_score - parent_score
         unacceptable_hidden_regression = hidden_improvement < -0.02
         unacceptable_transfer_regression = transfer_delta < -0.05
-        too_many_family_regressions = len(task_regressions) > max(1, len(candidate_eval.hidden_validation_loss_by_family) // 2)
+        large_family_regression = regression_penalty > max(0.02, 0.5 * max(0.0, hidden_improvement))
+        too_many_family_regressions = (
+            len(task_regressions) > max(1, len(candidate_eval.hidden_validation_loss_by_family) // 2)
+            and large_family_regression
+        )
+        validation_hidden_mismatch_guard = validation_improvement > 0.0 and hidden_improvement < 0.0
+        high_rollback_mismatch = validation_hidden_mismatch_guard and rollback_risk >= 0.25
+        calibrated_hidden_validation_acceptance = (
+            hidden_improvement > max(0.005, 0.40 * max(0.0, validation_improvement), 2.0 * abs(min(0.0, validation_improvement)))
+            and validation_improvement >= -0.012
+            and not large_family_regression
+            and not unacceptable_transfer_regression
+            and not high_rollback_mismatch
+        )
+        candidate_components.update(
+            {
+                "calibration_validation_hidden_gap": float(max(0.0, validation_improvement - hidden_improvement)),
+                "calibration_hidden_regression_flag": 1.0 if hidden_improvement < 0.0 else 0.0,
+                "calibration_high_rollback_mismatch_flag": 1.0 if high_rollback_mismatch else 0.0,
+                "calibration_task_family_regression_count": float(len(task_regressions)),
+                "calibration_task_family_regression_magnitude": float(regression_penalty),
+                "calibration_hidden_validation_acceptance_flag": 1.0 if calibrated_hidden_validation_acceptance else 0.0,
+            }
+        )
         accepted = bool(
-            score_delta > improvement_threshold
+            (score_delta > improvement_threshold or calibrated_hidden_validation_acceptance)
             and (validation_improvement > 0.0 or hidden_improvement > 0.0)
             and not unacceptable_hidden_regression
             and not unacceptable_transfer_regression
             and not too_many_family_regressions
+            and not high_rollback_mismatch
         )
         if accepted:
-            reason = "accepted"
+            reason = "accepted_hidden_validation_calibrated" if calibrated_hidden_validation_acceptance and score_delta <= improvement_threshold else "accepted"
+        elif high_rollback_mismatch:
+            reason = "validation_hidden_mismatch_with_rollback_risk"
         elif unacceptable_hidden_regression:
             reason = "hidden_validation_regression"
         elif unacceptable_transfer_regression:

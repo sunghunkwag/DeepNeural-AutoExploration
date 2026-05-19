@@ -77,37 +77,65 @@ class EvaluatorObjectiveMutator:
         selected: list[str] = []
         rationale: list[str] = []
         component_summary = _component_summary(selection_score_components)
+        repair_actions: list[str] = []
+        suspicious_mutations: list[str] = []
+        hidden_loss = component_summary.get("hidden_validation_loss", 0.0)
+        validation_loss = component_summary.get("validation_loss", 0.0)
+        validation_hidden_gap = max(0.0, hidden_loss - validation_loss)
+        mismatch_guard_triggered = (
+            validation_hidden_gap > 0.05
+            or component_summary.get("calibration_hidden_regression_flag", 0.0) > 0.0
+            or component_summary.get("calibration_high_rollback_mismatch_flag", 0.0) > 0.0
+        )
 
         if diagnosis.evaluator_overfit_risk > 0.25:
+            cfg["validation_loss_weight"] = max(0.05, cfg["validation_loss_weight"] - 0.07)
+            cfg["hidden_validation_loss_weight"] = min(1.0, cfg["hidden_validation_loss_weight"] + 0.10)
+            cfg["task_family_regression_penalty_weight"] = min(1.0, cfg["task_family_regression_penalty_weight"] + 0.04)
+            cfg["rollback_risk_weight"] = min(1.0, cfg["rollback_risk_weight"] + 0.04)
+            selected.extend(["validation-overfitting", "hidden-validation underweighting"])
+            repair_actions.extend(["lower_validation_weight", "raise_hidden_validation_weight", "raise_task_family_regression_penalty", "raise_rollback_risk_penalty"])
+            rationale.append("positive validation changes are not reliably surviving hidden validation")
+        if mismatch_guard_triggered:
             cfg["validation_loss_weight"] = max(0.05, cfg["validation_loss_weight"] - 0.05)
             cfg["hidden_validation_loss_weight"] = min(1.0, cfg["hidden_validation_loss_weight"] + 0.08)
-            selected.extend(["validation-overfitting", "hidden-validation underweighting"])
-            rationale.append("positive validation changes are not reliably surviving hidden validation")
+            cfg["task_family_regression_penalty_weight"] = min(1.0, cfg["task_family_regression_penalty_weight"] + 0.06)
+            cfg["rollback_risk_weight"] = min(1.0, cfg["rollback_risk_weight"] + 0.06)
+            selected.append("validation-hidden mismatch guard")
+            repair_actions.extend(["apply_validation_hidden_mismatch_guard", "objective_weight_rollback_against_validation_only_gain"])
+            suspicious_mutations.append("validation_weight_increase_or_hidden_weight_underuse")
+            rationale.append("selection components show validation-hidden mismatch or rollback-coupled hidden regression")
         if diagnosis.transfer_regression_risk > 0.15:
             cfg["transfer_score_weight"] = min(1.0, cfg["transfer_score_weight"] + 0.06)
             cfg["generalization_gap_penalty_weight"] = min(1.0, cfg["generalization_gap_penalty_weight"] + 0.04)
             selected.append("transfer underweighting")
+            repair_actions.append("raise_transfer_generalization_penalty")
             rationale.append("post-freeze transfer regression risk is elevated")
         if diagnosis.architecture_complexity_growth > 0.25:
             cfg["architecture_complexity_penalty_weight"] = min(1.0, cfg["architecture_complexity_penalty_weight"] + 0.05)
             selected.append("excessive complexity tolerance")
+            repair_actions.append("raise_architecture_complexity_penalty")
             rationale.append("architecture complexity grew faster than process-quality metrics")
         if max(diagnosis.rollback_rate_by_method.values() or [0.0]) > 0.5:
-            cfg["rollback_risk_weight"] = min(1.0, cfg["rollback_risk_weight"] + 0.06)
+            cfg["rollback_risk_weight"] = min(1.0, cfg["rollback_risk_weight"] + 0.10)
             selected.append("under-penalized rollback risk")
+            repair_actions.append("raise_rollback_risk_penalty")
             rationale.append("one or more mutation methods is rolling back too often")
         if diagnosis.task_family_balance < 0.75:
             cfg["task_family_regression_penalty_weight"] = min(1.0, cfg["task_family_regression_penalty_weight"] + 0.05)
             selected.append("task-family imbalance")
+            repair_actions.append("raise_task_family_regression_penalty")
             rationale.append("hidden-validation losses are imbalanced across task families")
         if component_summary.get("module_contribution_score", 0.0) <= 0.01 and diagnosis.probe_actionability_score > 0.5:
             cfg["module_contribution_weight"] = min(1.0, cfg["module_contribution_weight"] + 0.03)
             selected.append("accepted-candidate fragility")
+            repair_actions.append("raise_module_contribution_confirmation")
             rationale.append("module contribution signal is weak relative to available probe evidence")
         if diagnosis.probe_actionability_score < 0.5:
             cfg["representation_failure_penalty_weight"] = min(1.0, cfg["representation_failure_penalty_weight"] + 0.03)
             cfg["gradient_failure_penalty_weight"] = min(1.0, cfg["gradient_failure_penalty_weight"] + 0.03)
             selected.append("probe underweighting")
+            repair_actions.append("raise_probe_failure_penalties")
             rationale.append("probe actionability is low, so probe failures need clearer scoring pressure")
 
         mutated = EvaluatorObjectiveConfig.from_dict(cfg)
@@ -122,6 +150,11 @@ class EvaluatorObjectiveMutator:
             if guidance.get("avoided_harmful_config_patterns"):
                 selected.append("avoid_harmful_prior_config_pattern")
                 rationale.append("prior meta-config memory marked one or more evaluator changes as harmful")
+            if guidance.get("avoided_rollback_correlated_patterns"):
+                selected.append("avoid_rollback_correlated_config_pattern")
+                repair_actions.append("avoid_evaluator_config_correlated_with_rollback")
+                suspicious_mutations.extend(str(item) for item in guidance.get("avoided_rollback_correlated_patterns", []))
+                rationale.append("prior meta-config memory linked one or more evaluator changes to rollback increases")
             if guidance.get("reused_successful_config_patterns"):
                 selected.append("reuse_successful_prior_config_pattern")
                 rationale.append("prior meta-config memory supports one or more evaluator changes")
@@ -140,6 +173,16 @@ class EvaluatorObjectiveMutator:
                 "task_family_balance": diagnosis.task_family_balance,
                 "rollback_rate_by_method": diagnosis.rollback_rate_by_method,
                 "selection_component_summary": component_summary,
+                "evaluator_calibration_report": {
+                    "validation_hidden_mismatch_guard_triggered": mismatch_guard_triggered,
+                    "validation_hidden_gap": validation_hidden_gap,
+                    "hidden_regression_flag": component_summary.get("calibration_hidden_regression_flag", 0.0),
+                    "high_rollback_mismatch_flag": component_summary.get("calibration_high_rollback_mismatch_flag", 0.0),
+                    "task_family_regression_count": component_summary.get("calibration_task_family_regression_count", 0.0),
+                },
+                "objective_weight_change_attribution": _weight_changes(base.to_dict(), mutated.to_dict()),
+                "evaluator_overfit_repair_actions": sorted(set(repair_actions)),
+                "suspicious_evaluator_mutations": sorted(set(suspicious_mutations)),
                 "meta_config_memory_guidance": guidance,
             },
             used_heldout_labels=False,
@@ -156,6 +199,16 @@ def _component_summary(items: Sequence[Mapping[str, object]]) -> Dict[str, float
             if isinstance(value, (int, float)):
                 values.setdefault(str(key), []).append(float(value))
     return {key: sum(vals) / max(1, len(vals)) for key, vals in values.items()}
+
+
+def _weight_changes(base: Mapping[str, float], mutated: Mapping[str, float]) -> Dict[str, Dict[str, float]]:
+    out: Dict[str, Dict[str, float]] = {}
+    for key in sorted(set(base) | set(mutated)):
+        old = float(base.get(key, 0.0))
+        new = float(mutated.get(key, 0.0))
+        if abs(new - old) > 1e-12:
+            out[key] = {"old": old, "new": new, "delta": new - old}
+    return out
 
 
 def _bounded_float(value: object, low: float, high: float, default: float) -> float:

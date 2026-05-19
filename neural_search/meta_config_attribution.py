@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from statistics import mean
 from typing import Dict, Mapping
+
+from failure_residue import build_residue_lifecycle_report
 
 from .architecture_genome import stable_hash
 from .search_process_model import SearchProcessDiagnosis, SearchProcessModel, compute_process_improvement_components
@@ -59,6 +61,7 @@ class ConfigChangeAttributionReport:
     neutral_changes: list[str]
     process_improvement_components: Dict[str, float]
     evidence_used: Dict[str, object]
+    residue_lifecycle_report: Dict[str, object] = field(default_factory=dict)
     used_heldout_for_candidate_selection: bool = False
     heldout_used_only_for_post_freeze_diagnosis: bool = True
 
@@ -72,6 +75,7 @@ class ConfigChangeAttributionReport:
             "harmed_changes": list(self.harmed_changes),
             "neutral_changes": list(self.neutral_changes),
             "process_improvement_components": dict(self.process_improvement_components),
+            "residue_lifecycle_report": dict(self.residue_lifecycle_report),
             "evidence_used": dict(self.evidence_used),
             "used_heldout_for_candidate_selection": self.used_heldout_for_candidate_selection,
             "heldout_used_only_for_post_freeze_diagnosis": self.heldout_used_only_for_post_freeze_diagnosis,
@@ -112,6 +116,16 @@ class MetaConfigAttribution:
                 applied_matches_recommendation=(not first_next or not second_applied or first_next == second_applied),
             )
             changes.append(record)
+        residue_lifecycle = build_residue_lifecycle_report(
+            first_run,
+            second_run,
+            {
+                "changes": [change.to_dict() for change in changes],
+                "helped_changes": [change.config_path for change in changes if change.helped],
+                "harmed_changes": [change.config_path for change in changes if change.harmed],
+                "neutral_changes": [change.config_path for change in changes if change.neutral],
+            },
+        )
         payload = {
             "first": _run_id(first_run),
             "second": _run_id(second_run),
@@ -126,6 +140,7 @@ class MetaConfigAttribution:
             harmed_changes=[change.config_path for change in changes if change.harmed],
             neutral_changes=[change.config_path for change in changes if change.neutral],
             process_improvement_components=process_components,
+            residue_lifecycle_report=residue_lifecycle,
             evidence_used={
                 "first_next_run_config_present": bool(first_next),
                 "second_applied_next_run_config_present": bool(second_applied),

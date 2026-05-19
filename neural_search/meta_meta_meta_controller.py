@@ -148,8 +148,13 @@ class MetaMetaMetaController:
             evaluator_plan,
             curriculum_plan,
             "avoided_harmful_config_patterns",
-        ) + list(next_config_guidance.get("avoided_harmful_config_patterns", []))))
-        revert_recommendations = memory.repeatedly_harmful_paths(min_count=2) if memory is not None else []
+        ) + _memory_guidance_values(
+            strategy_plan,
+            evaluator_plan,
+            curriculum_plan,
+            "avoided_rollback_correlated_patterns",
+        ) + list(next_config_guidance.get("avoided_harmful_config_patterns", [])) + list(next_config_guidance.get("avoided_rollback_correlated_patterns", []))))
+        revert_recommendations = sorted(set((memory.repeatedly_harmful_paths(min_count=2) + memory.rollback_correlated_harmful_paths("", min_count=2)) if memory is not None else []))
         meta_policy_confidence = _meta_policy_confidence(memory, reused_patterns, avoided_patterns, revert_recommendations)
         decision_payload = {
             "input_run_id": input_run_id,
@@ -236,7 +241,7 @@ def _build_next_config(
         search_strategy_config=SearchStrategyConfig.from_dict(strategy_plan.mutated_config),
         evaluator_objective_config=EvaluatorObjectiveConfig.from_dict(evaluator_plan.mutated_config),
         curriculum_strategy_config=CurriculumStrategyConfig.from_dict(curriculum_plan.mutated_config),
-        recommended_mode=mode if mode in {"smoke", "quick"} else "smoke",
+        recommended_mode=mode if mode in {"smoke", "quick", "full"} else "smoke",
         recommended_seed_policy="same_seed",
         recommended_generations=generations,
         recommended_candidate_count=candidate_count,
@@ -322,6 +327,7 @@ def _apply_next_config_memory_guidance(
     guidance: Dict[str, object] = {
         "reused_successful_config_patterns": [],
         "avoided_harmful_config_patterns": [],
+        "avoided_rollback_correlated_patterns": [],
         "lower_confidence_neutral_patterns": [],
     }
     if memory is None or not memory.records:
@@ -330,6 +336,7 @@ def _apply_next_config_memory_guidance(
     current_generations = int(cfg.get("generations", 1)) if isinstance(cfg, Mapping) else 1
     current_count = int(cfg.get("candidate_count", 3)) if isinstance(cfg, Mapping) else 3
     harmful = set(memory.harmful_change_paths(""))
+    rollback_harmful = set(memory.rollback_correlated_harmful_paths(""))
     helpful = set(memory.helpful_change_paths(""))
     neutral = set(memory.repeatedly_neutral_paths(""))
     proposed = {
@@ -348,9 +355,12 @@ def _apply_next_config_memory_guidance(
     for path, value in proposed.items():
         if value == base[path]:
             continue
-        if path in harmful:
+        if path in harmful or path in rollback_harmful:
             adjusted[path] = base[path]
-            guidance["avoided_harmful_config_patterns"].append(path)  # type: ignore[union-attr]
+            if path in harmful:
+                guidance["avoided_harmful_config_patterns"].append(path)  # type: ignore[union-attr]
+            if path in rollback_harmful:
+                guidance["avoided_rollback_correlated_patterns"].append(path)  # type: ignore[union-attr]
         elif path in helpful:
             guidance["reused_successful_config_patterns"].append(path)  # type: ignore[union-attr]
         elif path in neutral:

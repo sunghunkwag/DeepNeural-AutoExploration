@@ -93,9 +93,12 @@ class MetaDecisionQualityEvaluator:
         }
         quality_scores["overall_meta_decision_quality_score"] = float(mean(quality_scores.values()))
         final_delta = float(components.get("final_process_improvement_delta", 0.0))
+        rollback_delta = float(components.get("rollback_rate_delta", 0.0))
+        overfit_delta = float(components.get("evaluator_overfit_risk_delta", 0.0))
         overall = quality_scores["overall_meta_decision_quality_score"]
-        should_reuse = overall >= 0.60 and final_delta > 0.0 and len(helped) >= len(harmed)
-        should_revert = overall < 0.35 or (final_delta < 0.0 and len(harmed) > len(helped))
+        rollback_or_overfit_regressed = rollback_delta > 0.0 or overfit_delta > 0.0
+        should_reuse = overall >= 0.60 and final_delta > 0.0 and len(helped) >= len(harmed) and not rollback_or_overfit_regressed
+        should_revert = overall < 0.35 or (final_delta < 0.0 and len(harmed) > len(helped)) or (rollback_delta > 0.05 and overfit_delta > 0.05)
         should_mutate = not should_reuse and not should_revert
         if should_reuse:
             recommendation = "trust_previous_config"
@@ -123,6 +126,8 @@ class MetaDecisionQualityEvaluator:
                 "process_improvement_components": components,
                 "validation_hidden_mismatch_delta": mismatch_delta,
                 "persistent_residue_count_delta": persistent_delta,
+                "rollback_repair_needed": rollback_delta > 0.0,
+                "evaluator_overfit_repair_needed": overfit_delta > 0.0,
                 "attribution_id": attr.get("attribution_id", ""),
             },
         )

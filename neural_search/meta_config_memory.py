@@ -131,6 +131,29 @@ class MetaConfigMemory:
     def repeatedly_harmful_paths(self, *, min_count: int = 2) -> list[str]:
         return self.harmful_change_paths("", min_count=min_count)
 
+    def rollback_correlated_harmful_paths(self, section_prefix: str = "", *, min_count: int = 1) -> list[str]:
+        counts: Dict[str, int] = {}
+        for record in self.records:
+            attr = record.attribution_report
+            if not isinstance(attr, Mapping):
+                continue
+            components = attr.get("process_improvement_components", {})
+            transition_rollback_delta = _float((components or {}).get("rollback_rate_delta")) if isinstance(components, Mapping) else 0.0
+            changes = attr.get("changes", [])
+            if not isinstance(changes, list):
+                continue
+            for change in changes:
+                if not isinstance(change, Mapping):
+                    continue
+                path = str(change.get("config_path", ""))
+                if section_prefix and not path.startswith(section_prefix):
+                    continue
+                effect = change.get("observed_effect", {})
+                rollback_delta = _float(effect.get("rollback_rate_delta")) if isinstance(effect, Mapping) else 0.0
+                if rollback_delta > 0.0 or (transition_rollback_delta > 0.0 and bool(change.get("harmed"))):
+                    counts[path] = counts.get(path, 0) + 1
+        return sorted(path for path, count in counts.items() if count >= min_count)
+
     def repeatedly_neutral_paths(self, section_prefix: str = "", *, min_count: int = 2) -> list[str]:
         counts: Dict[str, int] = {}
         for record in self.records:
@@ -162,20 +185,26 @@ def apply_memory_guidance_to_config(
         return dict(proposed_config), {
             "reused_successful_config_patterns": [],
             "avoided_harmful_config_patterns": [],
+            "avoided_rollback_correlated_patterns": [],
             "lower_confidence_neutral_patterns": [],
         }
     adjusted = _deep_copy_mapping(proposed_config)
     helpful = set(memory.helpful_change_paths(section_prefix))
     harmful = set(memory.harmful_change_paths(section_prefix))
+    rollback_harmful = set(memory.rollback_correlated_harmful_paths(section_prefix))
     neutral = set(memory.repeatedly_neutral_paths(section_prefix))
     changed_paths = [path for path, old, new in _diff_nested(base_config, proposed_config, section_prefix) if old != new]
     avoided: list[str] = []
+    avoided_rollback: list[str] = []
     reused: list[str] = []
     lowered: list[str] = []
     for path in changed_paths:
-        if path in harmful:
+        if path in harmful or path in rollback_harmful:
             _set_path(adjusted, path[len(section_prefix) + 1 :], _get_path(base_config, path[len(section_prefix) + 1 :]))
-            avoided.append(path)
+            if path in harmful:
+                avoided.append(path)
+            if path in rollback_harmful:
+                avoided_rollback.append(path)
         elif path in helpful:
             reused.append(path)
         elif path in neutral:
@@ -183,6 +212,7 @@ def apply_memory_guidance_to_config(
     return adjusted, {
         "reused_successful_config_patterns": sorted(reused),
         "avoided_harmful_config_patterns": sorted(avoided),
+        "avoided_rollback_correlated_patterns": sorted(avoided_rollback),
         "lower_confidence_neutral_patterns": sorted(lowered),
     }
 
@@ -260,3 +290,7 @@ def _get_path(config: Mapping[str, object], path: str) -> object:
             return None
         cursor = cursor.get(part)
     return cursor
+
+
+def _float(value: object) -> float:
+    return float(value) if isinstance(value, (int, float)) else 0.0

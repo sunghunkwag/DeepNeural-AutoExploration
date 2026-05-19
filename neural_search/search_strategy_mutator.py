@@ -111,6 +111,9 @@ class SearchStrategyMutator:
         exploration = base.exploration_temperature
         selected: list[str] = []
         rationale: list[str] = []
+        rollback_risk_budget = 0.65
+        aggregate_rollback_rate = _mean(diagnosis.rollback_rate_by_method.values()) if diagnosis.rollback_rate_by_method else 0.0
+        rollback_budget_exceeded = aggregate_rollback_rate > rollback_risk_budget
 
         deeper_level_failed = any(value < -0.02 for level, value in diagnosis.depth_usefulness_by_level.items() if int(level) >= 2)
         if _mean(diagnosis.depth_usefulness_by_level.values()) < 0.0 and diagnosis.persistent_residue_types and not deeper_level_failed:
@@ -124,12 +127,26 @@ class SearchStrategyMutator:
             rationale.append("deeper levels produced negative selection deltas")
         for method, rate in diagnosis.rollback_rate_by_method.items():
             if rate >= 0.5:
-                penalties[method] = min(1.0, penalties.get(method, 0.0) + 0.20 * rate)
+                penalties[method] = min(1.0, penalties.get(method, 0.0) + 0.30 * rate)
+                if method in boosts:
+                    boosts[method] = max(0.0, boosts.get(method, 0.0) - 0.15 * rate)
                 selected.append("penalize_repeated_failed_mutation")
                 rationale.append(f"{method} rollback rate {rate:.2f}")
+        if rollback_budget_exceeded:
+            rollback_weight = min(1.0, rollback_weight + 0.10)
+            exploration = max(0.05, exploration - 0.10)
+            depth_thresholds = {key: min(0.95, value + 0.03) for key, value in depth_thresholds.items()}
+            selected.append("enforce_rollback_risk_budget")
+            rationale.append(f"aggregate rollback rate {aggregate_rollback_rate:.2f} exceeded budget {rollback_risk_budget:.2f}")
         for failure_type in diagnosis.persistent_residue_types:
             method = RESIDUE_TO_MUTATION.get(failure_type)
             if method:
+                method_rollback = diagnosis.rollback_rate_by_method.get(method, 0.0)
+                if method_rollback > rollback_risk_budget:
+                    penalties[method] = min(1.0, penalties.get(method, 0.0) + 0.20)
+                    selected.append("defer_residue_boost_over_rollback_budget")
+                    rationale.append(f"{failure_type} persists but {method} exceeded rollback budget")
+                    continue
                 boosts[method] = min(1.0, boosts.get(method, 0.0) + 0.20)
                 selected.append("boost_mutation_for_persistent_residue")
                 rationale.append(f"{failure_type} persists; boost {method}")
@@ -183,6 +200,9 @@ class SearchStrategyMutator:
             if guidance.get("avoided_harmful_config_patterns"):
                 selected.append("avoid_harmful_prior_config_pattern")
                 rationale.append("prior meta-config memory marked one or more proposed strategy changes as harmful")
+            if guidance.get("avoided_rollback_correlated_patterns"):
+                selected.append("avoid_rollback_correlated_config_pattern")
+                rationale.append("prior meta-config memory linked one or more strategy changes to rollback increases")
             if guidance.get("reused_successful_config_patterns"):
                 selected.append("reuse_successful_prior_config_pattern")
                 rationale.append("prior meta-config memory supports one or more proposed strategy changes")
@@ -197,6 +217,9 @@ class SearchStrategyMutator:
             evidence_used={
                 "persistent_residue_types": diagnosis.persistent_residue_types,
                 "rollback_rate_by_method": diagnosis.rollback_rate_by_method,
+                "rollback_risk_budget": rollback_risk_budget,
+                "aggregate_rollback_rate": aggregate_rollback_rate,
+                "rollback_budget_exceeded": rollback_budget_exceeded,
                 "evaluator_overfit_risk": diagnosis.evaluator_overfit_risk,
                 "probe_actionability_score": diagnosis.probe_actionability_score,
                 "architecture_complexity_growth": diagnosis.architecture_complexity_growth,
