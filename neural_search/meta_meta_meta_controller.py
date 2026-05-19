@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Mapping
 
 from .architecture_genome import stable_hash
 from .curriculum_strategy_mutator import CurriculumMutationPlan, CurriculumStrategyConfig, CurriculumStrategyMutator
 from .evaluator_objective_mutator import EvaluatorObjectiveConfig, EvaluatorObjectiveMutationPlan, EvaluatorObjectiveMutator
+from .meta_config_memory import MetaConfigMemory
 from .next_run_config import NextRunConfig
 from .search_process_model import SearchProcessDiagnosis, SearchProcessModel
 from .search_strategy_mutator import SearchStrategyConfig, SearchStrategyMutationPlan, SearchStrategyMutator
@@ -52,6 +53,11 @@ class MetaMetaMetaDecision:
     risk_assessment: Dict[str, object]
     used_heldout_for_candidate_selection: bool = False
     heldout_used_only_for_post_freeze_diagnosis: bool = True
+    prior_meta_memory_used: bool = False
+    reused_successful_config_patterns: list[str] = field(default_factory=list)
+    avoided_harmful_config_patterns: list[str] = field(default_factory=list)
+    revert_recommendations: list[str] = field(default_factory=list)
+    meta_policy_confidence: float = 1.0
 
     def to_dict(self) -> Dict[str, object]:
         return {
@@ -68,6 +74,11 @@ class MetaMetaMetaDecision:
             "risk_assessment": dict(self.risk_assessment),
             "used_heldout_for_candidate_selection": self.used_heldout_for_candidate_selection,
             "heldout_used_only_for_post_freeze_diagnosis": self.heldout_used_only_for_post_freeze_diagnosis,
+            "prior_meta_memory_used": self.prior_meta_memory_used,
+            "reused_successful_config_patterns": list(self.reused_successful_config_patterns),
+            "avoided_harmful_config_patterns": list(self.avoided_harmful_config_patterns),
+            "revert_recommendations": list(self.revert_recommendations),
+            "meta_policy_confidence": self.meta_policy_confidence,
         }
 
 
@@ -96,11 +107,12 @@ class MetaMetaMetaControllerOutput:
 class MetaMetaMetaController:
     """Evaluate and adapt the search process after candidate decisions are frozen."""
 
-    def __init__(self) -> None:
+    def __init__(self, prior_meta_memory: MetaConfigMemory | Mapping[str, object] | None = None) -> None:
         self.process_model = SearchProcessModel()
         self.strategy_mutator = SearchStrategyMutator()
         self.evaluator_mutator = EvaluatorObjectiveMutator()
         self.curriculum_mutator = CurriculumStrategyMutator()
+        self.prior_meta_memory = _coerce_memory(prior_meta_memory)
 
     def run(
         self,
@@ -109,18 +121,36 @@ class MetaMetaMetaController:
         base_search_config: SearchStrategyConfig | None = None,
         base_evaluator_config: EvaluatorObjectiveConfig | None = None,
         base_curriculum_config: CurriculumStrategyConfig | None = None,
+        prior_meta_memory: MetaConfigMemory | Mapping[str, object] | None = None,
     ) -> MetaMetaMetaControllerOutput:
+        memory = _coerce_memory(prior_meta_memory) or self.prior_meta_memory
         diagnosis = self.process_model.diagnose(result)
-        strategy_plan = self.strategy_mutator.mutate(diagnosis, base_search_config)
+        strategy_plan = self.strategy_mutator.mutate(diagnosis, base_search_config, memory)
         evaluator_plan = self.evaluator_mutator.mutate(
             diagnosis,
             _list_of_mappings(result.get("selection_score_components", [])),
             base_evaluator_config,
+            memory,
         )
-        curriculum_plan = self.curriculum_mutator.mutate(diagnosis, base_curriculum_config)
+        curriculum_plan = self.curriculum_mutator.mutate(diagnosis, base_curriculum_config, memory)
         next_config = _build_next_config(result, diagnosis, strategy_plan, evaluator_plan, curriculum_plan)
+        next_config, next_config_guidance = _apply_next_config_memory_guidance(result, next_config, memory)
         rewrite = _rewrite_plan(result, diagnosis, next_config)
         input_run_id = _input_run_id(result)
+        reused_patterns = sorted(set(_memory_guidance_values(
+            strategy_plan,
+            evaluator_plan,
+            curriculum_plan,
+            "reused_successful_config_patterns",
+        ) + list(next_config_guidance.get("reused_successful_config_patterns", []))))
+        avoided_patterns = sorted(set(_memory_guidance_values(
+            strategy_plan,
+            evaluator_plan,
+            curriculum_plan,
+            "avoided_harmful_config_patterns",
+        ) + list(next_config_guidance.get("avoided_harmful_config_patterns", []))))
+        revert_recommendations = memory.repeatedly_harmful_paths(min_count=2) if memory is not None else []
+        meta_policy_confidence = _meta_policy_confidence(memory, reused_patterns, avoided_patterns, revert_recommendations)
         decision_payload = {
             "input_run_id": input_run_id,
             "diagnosis": diagnosis.to_dict(),
@@ -128,6 +158,9 @@ class MetaMetaMetaController:
             "evaluator": evaluator_plan.mutated_config,
             "curriculum": curriculum_plan.mutated_config,
             "rewrite": rewrite.to_dict(),
+            "memory_reused": reused_patterns,
+            "memory_avoided": avoided_patterns,
+            "memory_revert": revert_recommendations,
         }
         decision = MetaMetaMetaDecision(
             decision_id=stable_hash(decision_payload, prefix="mmm_"),
@@ -143,6 +176,10 @@ class MetaMetaMetaController:
                 "architecture_decision_count": len(_list_of_mappings(result.get("architecture_decisions", []))),
                 "failure_residue_count": len(_list_of_mappings(result.get("failure_residues", []))),
                 "heldout_metrics_used_post_freeze_only": True,
+                "prior_meta_memory_used": bool(memory is not None and memory.records),
+                "reused_successful_config_patterns": reused_patterns,
+                "avoided_harmful_config_patterns": avoided_patterns,
+                "revert_recommendations": revert_recommendations,
             },
             expected_improvement_target=_expected_target(diagnosis),
             risk_assessment={
@@ -153,6 +190,11 @@ class MetaMetaMetaController:
             },
             used_heldout_for_candidate_selection=False,
             heldout_used_only_for_post_freeze_diagnosis=True,
+            prior_meta_memory_used=bool(memory is not None and memory.records),
+            reused_successful_config_patterns=reused_patterns,
+            avoided_harmful_config_patterns=avoided_patterns,
+            revert_recommendations=revert_recommendations,
+            meta_policy_confidence=meta_policy_confidence,
         )
         return MetaMetaMetaControllerOutput(
             decision=decision,
@@ -270,6 +312,106 @@ def _expected_target(diagnosis: SearchProcessDiagnosis) -> str:
 def _focus_families(diagnosis: SearchProcessDiagnosis) -> list[str]:
     items = sorted(diagnosis.residue_concentration_by_task_family.items(), key=lambda item: item[1], reverse=True)
     return [family for family, value in items if value > 0.0][:3]
+
+
+def _apply_next_config_memory_guidance(
+    result: Mapping[str, object],
+    next_config: NextRunConfig,
+    memory: MetaConfigMemory | None,
+) -> tuple[NextRunConfig, Dict[str, object]]:
+    guidance: Dict[str, object] = {
+        "reused_successful_config_patterns": [],
+        "avoided_harmful_config_patterns": [],
+        "lower_confidence_neutral_patterns": [],
+    }
+    if memory is None or not memory.records:
+        return next_config, guidance
+    cfg = result.get("config", {})
+    current_generations = int(cfg.get("generations", 1)) if isinstance(cfg, Mapping) else 1
+    current_count = int(cfg.get("candidate_count", 3)) if isinstance(cfg, Mapping) else 3
+    harmful = set(memory.harmful_change_paths(""))
+    helpful = set(memory.helpful_change_paths(""))
+    neutral = set(memory.repeatedly_neutral_paths(""))
+    proposed = {
+        "recommended_generations": next_config.recommended_generations,
+        "recommended_candidate_count": next_config.recommended_candidate_count,
+        "focus_failure_types": list(next_config.recommended_focus_failure_types),
+        "focus_task_families": list(next_config.recommended_focus_task_families),
+    }
+    base = {
+        "recommended_generations": current_generations,
+        "recommended_candidate_count": current_count,
+        "focus_failure_types": [],
+        "focus_task_families": [],
+    }
+    adjusted = dict(proposed)
+    for path, value in proposed.items():
+        if value == base[path]:
+            continue
+        if path in harmful:
+            adjusted[path] = base[path]
+            guidance["avoided_harmful_config_patterns"].append(path)  # type: ignore[union-attr]
+        elif path in helpful:
+            guidance["reused_successful_config_patterns"].append(path)  # type: ignore[union-attr]
+        elif path in neutral:
+            guidance["lower_confidence_neutral_patterns"].append(path)  # type: ignore[union-attr]
+    if adjusted == proposed:
+        return next_config, guidance
+    return (
+        NextRunConfig(
+            search_strategy_config=next_config.search_strategy_config,
+            evaluator_objective_config=next_config.evaluator_objective_config,
+            curriculum_strategy_config=next_config.curriculum_strategy_config,
+            recommended_mode=next_config.recommended_mode,
+            recommended_seed_policy=next_config.recommended_seed_policy,
+            recommended_generations=int(adjusted["recommended_generations"]),
+            recommended_candidate_count=int(adjusted["recommended_candidate_count"]),
+            recommended_focus_failure_types=[str(item) for item in adjusted["focus_failure_types"]],
+            recommended_focus_task_families=[str(item) for item in adjusted["focus_task_families"]],
+        ),
+        guidance,
+    )
+
+
+def _coerce_memory(value: MetaConfigMemory | Mapping[str, object] | None) -> MetaConfigMemory | None:
+    if value is None:
+        return None
+    if isinstance(value, MetaConfigMemory):
+        return value
+    if isinstance(value, Mapping):
+        return MetaConfigMemory.from_dict(value)
+    return None
+
+
+def _memory_guidance_values(
+    strategy_plan: SearchStrategyMutationPlan,
+    evaluator_plan: EvaluatorObjectiveMutationPlan,
+    curriculum_plan: CurriculumMutationPlan,
+    key: str,
+) -> list[str]:
+    out: list[str] = []
+    for plan in (strategy_plan, evaluator_plan, curriculum_plan):
+        guidance = plan.evidence_used.get("meta_config_memory_guidance", {})
+        if isinstance(guidance, Mapping):
+            values = guidance.get(key, [])
+            if isinstance(values, list):
+                out.extend(str(item) for item in values)
+    return sorted(set(out))
+
+
+def _meta_policy_confidence(
+    memory: MetaConfigMemory | None,
+    reused_patterns: list[str],
+    avoided_patterns: list[str],
+    revert_recommendations: list[str],
+) -> float:
+    if memory is None or not memory.records:
+        return 0.55
+    confidence = 0.60 + 0.05 * min(4, len(reused_patterns)) + 0.03 * min(4, len(avoided_patterns))
+    confidence -= 0.08 * min(4, len(revert_recommendations))
+    if memory.latest_recommendation() == "revert_previous_config":
+        confidence -= 0.08
+    return float(max(0.05, min(0.95, confidence)))
 
 
 def _list_of_mappings(value: object) -> list[Mapping[str, object]]:

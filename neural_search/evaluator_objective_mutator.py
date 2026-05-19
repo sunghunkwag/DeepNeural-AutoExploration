@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Mapping, Sequence
 
+from .meta_config_memory import MetaConfigMemory, apply_memory_guidance_to_config
 from .search_process_model import SearchProcessDiagnosis
 
 
@@ -69,6 +70,7 @@ class EvaluatorObjectiveMutator:
         diagnosis: SearchProcessDiagnosis,
         selection_score_components: Sequence[Mapping[str, object]] = (),
         base_config: EvaluatorObjectiveConfig | None = None,
+        prior_meta_memory: MetaConfigMemory | None = None,
     ) -> EvaluatorObjectiveMutationPlan:
         base = base_config or EvaluatorObjectiveConfig()
         cfg = dict(base.to_dict())
@@ -109,6 +111,23 @@ class EvaluatorObjectiveMutator:
             rationale.append("probe actionability is low, so probe failures need clearer scoring pressure")
 
         mutated = EvaluatorObjectiveConfig.from_dict(cfg)
+        guidance: Dict[str, object] = {}
+        if prior_meta_memory is not None:
+            adjusted, guidance = apply_memory_guidance_to_config(
+                "evaluator_objective_config",
+                base.to_dict(),
+                mutated.to_dict(),
+                prior_meta_memory,
+            )
+            if guidance.get("avoided_harmful_config_patterns"):
+                selected.append("avoid_harmful_prior_config_pattern")
+                rationale.append("prior meta-config memory marked one or more evaluator changes as harmful")
+            if guidance.get("reused_successful_config_patterns"):
+                selected.append("reuse_successful_prior_config_pattern")
+                rationale.append("prior meta-config memory supports one or more evaluator changes")
+            if guidance.get("lower_confidence_neutral_patterns"):
+                rationale.append("prior neutral config changes lower confidence for repeated evaluator mutations")
+            mutated = EvaluatorObjectiveConfig.from_dict(adjusted)
         return EvaluatorObjectiveMutationPlan(
             base_config=base.to_dict(),
             mutated_config=mutated.to_dict(),
@@ -121,6 +140,7 @@ class EvaluatorObjectiveMutator:
                 "task_family_balance": diagnosis.task_family_balance,
                 "rollback_rate_by_method": diagnosis.rollback_rate_by_method,
                 "selection_component_summary": component_summary,
+                "meta_config_memory_guidance": guidance,
             },
             used_heldout_labels=False,
         )

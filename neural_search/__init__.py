@@ -9,6 +9,9 @@ from .architecture_genome import ArchitectureGenome
 from .architecture_evaluator import ArchitectureDecision, ArchitectureEvaluator
 from .agi_relevance_metrics import compute_agi_relevance_metrics
 from .deep_search_controller import DeepSearchController, DeepSearchDecision
+from .meta_config_attribution import ConfigChangeAttributionReport, ConfigChangeRecord, MetaConfigAttribution
+from .meta_config_memory import MetaConfigMemory
+from .meta_decision_quality import MetaDecisionQualityEvaluator, MetaDecisionQualityReport
 from .meta_meta_meta_controller import MetaMetaMetaController, MetaMetaMetaDecision
 from .next_run_config import NextRunConfig
 from .search_process_model import SearchProcessDiagnosis, SearchProcessModel
@@ -32,6 +35,12 @@ __all__ = [
     "DeepSearchDecision",
     "MetaMetaMetaController",
     "MetaMetaMetaDecision",
+    "MetaConfigAttribution",
+    "ConfigChangeRecord",
+    "ConfigChangeAttributionReport",
+    "MetaConfigMemory",
+    "MetaDecisionQualityEvaluator",
+    "MetaDecisionQualityReport",
     "GradientProbeResult",
     "MUTATION_METHODS",
     "MultiDomainBatch",

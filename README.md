@@ -22,10 +22,10 @@ Current full regression check:
 
 ```bash
 python -m pytest -q
-# 230 passed
+# 239 passed
 ```
 
-The autonomous neural exploration loop now includes an evidence-guided deep search layer and a post-freeze meta-meta-meta search controller. The deep search layer uses failure residues, representation and gradient probes, validation/hidden-validation trends, rollback reasons, architecture complexity, and module contribution signals to select bounded mutation depth and mutation families. The meta-meta-meta layer diagnoses the search process itself and proposes bounded next-run search, evaluator, and curriculum config changes. Candidate selection remains validation/hidden-validation gated, and held-out test labels are evaluated only after candidate freeze.
+The autonomous neural exploration loop now includes an evidence-guided deep search layer and a post-freeze meta-meta-meta search controller. The deep search layer uses failure residues, representation and gradient probes, validation/hidden-validation trends, rollback reasons, architecture complexity, and module contribution signals to select bounded mutation depth and mutation families. The meta-meta-meta layer diagnoses the search process itself, proposes bounded next-run search/evaluator/curriculum config changes, runs the next experiment, attributes which config changes likely helped or harmed, evaluates decision quality, records bounded JSON config memory, and emits explicit next-run trust/revise/revert recommendations. Candidate selection remains validation/hidden-validation gated, and held-out test labels are evaluated only after candidate freeze.
 
 ## Main Components
 
@@ -101,6 +101,8 @@ Meta-meta-meta search-process control:
 ```bash
 python benchmarks/meta_meta_meta_search_benchmark.py --mode smoke --seed 42
 ```
+
+The meta-meta-meta benchmark writes first-run and second-run outputs, the applied next-run config, strict process-improvement components, config-change attribution, meta-decision quality, estimated counterfactual reports, a bounded meta-config memory JSON file, and a manifest with anti-cheat checks.
 
 Other runnable entry points:
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Mapping
 
+from .meta_config_memory import MetaConfigMemory, apply_memory_guidance_to_config
 from .search_process_model import TASK_FAMILIES, SearchProcessDiagnosis
 
 
@@ -78,6 +79,7 @@ class CurriculumStrategyMutator:
         self,
         diagnosis: SearchProcessDiagnosis,
         base_config: CurriculumStrategyConfig | None = None,
+        prior_meta_memory: MetaConfigMemory | None = None,
     ) -> CurriculumMutationPlan:
         base = base_config or CurriculumStrategyConfig()
         weights = dict(base.family_sampling_weights)
@@ -140,6 +142,23 @@ class CurriculumStrategyMutator:
             memory_distractor_count=memory_count,
             object_interaction_strength=object_strength,
         )
+        guidance: Dict[str, object] = {}
+        if prior_meta_memory is not None:
+            adjusted, guidance = apply_memory_guidance_to_config(
+                "curriculum_strategy_config",
+                base.to_dict(),
+                mutated.to_dict(),
+                prior_meta_memory,
+            )
+            if guidance.get("avoided_harmful_config_patterns"):
+                selected.append("avoid_harmful_prior_config_pattern")
+                rationale.append("prior meta-config memory marked one or more curriculum changes as harmful")
+            if guidance.get("reused_successful_config_patterns"):
+                selected.append("reuse_successful_prior_config_pattern")
+                rationale.append("prior meta-config memory supports one or more curriculum changes")
+            if guidance.get("lower_confidence_neutral_patterns"):
+                rationale.append("prior neutral config changes lower confidence for repeated curriculum mutations")
+            mutated = CurriculumStrategyConfig.from_dict(adjusted)
         return CurriculumMutationPlan(
             base_config=base.to_dict(),
             mutated_config=mutated.to_dict(),
@@ -151,6 +170,7 @@ class CurriculumStrategyMutator:
                 "residue_concentration_by_task_family": diagnosis.residue_concentration_by_task_family,
                 "transfer_regression_risk": diagnosis.transfer_regression_risk,
                 "evaluator_overfit_risk": diagnosis.evaluator_overfit_risk,
+                "meta_config_memory_guidance": guidance,
             },
             used_heldout_labels_for_candidate_selection=False,
             heldout_used_only_for_post_freeze_diagnosis=True,

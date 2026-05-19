@@ -119,6 +119,64 @@ class SearchProcessModel:
         )
 
 
+def compute_process_improvement_components(
+    first: SearchProcessDiagnosis | Mapping[str, object],
+    second: SearchProcessDiagnosis | Mapping[str, object],
+    first_result: Mapping[str, object] | None = None,
+    second_result: Mapping[str, object] | None = None,
+) -> Dict[str, float]:
+    """Strict signed decomposition of second-run process change.
+
+    Positive deltas mean the second run increased a desirable process signal.
+    Risk deltas remain signed and are subtracted from the final score.
+    """
+
+    first_diag = _diagnosis_to_mapping(first)
+    second_diag = _diagnosis_to_mapping(second)
+    hidden_validation_robustness_delta = _run_metric(
+        second_result,
+        "hidden_validation_robustness",
+        _derived_hidden_validation_robustness(second_diag),
+    ) - _run_metric(
+        first_result,
+        "hidden_validation_robustness",
+        _derived_hidden_validation_robustness(first_diag),
+    )
+    residue_resolution_delta = _run_metric(
+        second_result,
+        "residue_resolution_rate",
+        _mean_mapping(second_diag.get("residue_resolution_rate_by_failure_type", {})),
+    ) - _run_metric(
+        first_result,
+        "residue_resolution_rate",
+        _mean_mapping(first_diag.get("residue_resolution_rate_by_failure_type", {})),
+    )
+    task_family_balance_delta = _diag_float(second_diag, "task_family_balance") - _diag_float(first_diag, "task_family_balance")
+    rollback_rate_delta = _aggregate_rollback_rate(second_diag, second_result) - _aggregate_rollback_rate(first_diag, first_result)
+    transfer_regression_risk_delta = _diag_float(second_diag, "transfer_regression_risk") - _diag_float(first_diag, "transfer_regression_risk")
+    complexity_growth_delta = _diag_float(second_diag, "architecture_complexity_growth") - _diag_float(first_diag, "architecture_complexity_growth")
+    evaluator_overfit_risk_delta = _diag_float(second_diag, "evaluator_overfit_risk") - _diag_float(first_diag, "evaluator_overfit_risk")
+    final = (
+        hidden_validation_robustness_delta
+        + residue_resolution_delta
+        + task_family_balance_delta
+        - rollback_rate_delta
+        - transfer_regression_risk_delta
+        - complexity_growth_delta
+        - evaluator_overfit_risk_delta
+    )
+    return {
+        "hidden_validation_robustness_delta": float(hidden_validation_robustness_delta),
+        "residue_resolution_delta": float(residue_resolution_delta),
+        "task_family_balance_delta": float(task_family_balance_delta),
+        "rollback_rate_delta": float(rollback_rate_delta),
+        "transfer_regression_risk_delta": float(transfer_regression_risk_delta),
+        "complexity_growth_delta": float(complexity_growth_delta),
+        "evaluator_overfit_risk_delta": float(evaluator_overfit_risk_delta),
+        "final_process_improvement_delta": float(final),
+    }
+
+
 def _depth_usefulness(decisions: Sequence[Mapping[str, object]], depth_by_decision_id: Mapping[str, int]) -> Dict[str, float]:
     values: Dict[str, list[float]] = defaultdict(list)
     for decision in decisions:
@@ -297,6 +355,48 @@ def _mapping_bool(payload: object, key: str, default: bool) -> bool:
     if not isinstance(payload, Mapping):
         return default
     return bool(payload.get(key, default))
+
+
+def _diagnosis_to_mapping(value: SearchProcessDiagnosis | Mapping[str, object]) -> Mapping[str, object]:
+    if isinstance(value, SearchProcessDiagnosis):
+        return value.to_dict()
+    return value
+
+
+def _diag_float(payload: Mapping[str, object], key: str) -> float:
+    value = payload.get(key, 0.0)
+    return float(value) if isinstance(value, (int, float)) else 0.0
+
+
+def _run_metric(result: Mapping[str, object] | None, name: str, default: float) -> float:
+    if isinstance(result, Mapping):
+        agi = result.get("agi_relevance_metrics", {})
+        if isinstance(agi, Mapping) and isinstance(agi.get(name), (int, float)):
+            return float(agi[name])
+        metrics = result.get("metrics", {})
+        if isinstance(metrics, Mapping) and isinstance(metrics.get(name), (int, float)):
+            return float(metrics[name])
+    return float(default)
+
+
+def _derived_hidden_validation_robustness(diagnosis: Mapping[str, object]) -> float:
+    return float(max(0.0, min(1.0, 1.0 - _diag_float(diagnosis, "evaluator_overfit_risk"))))
+
+
+def _mean_mapping(value: object) -> float:
+    if not isinstance(value, Mapping) or not value:
+        return 0.0
+    values = [float(item) for item in value.values() if isinstance(item, (int, float))]
+    return float(mean(values)) if values else 0.0
+
+
+def _aggregate_rollback_rate(diagnosis: Mapping[str, object], result: Mapping[str, object] | None = None) -> float:
+    if isinstance(result, Mapping):
+        decisions = _list_of_mappings(result.get("architecture_decisions", []))
+        if decisions:
+            rollbacks = sum(1 for item in decisions if bool(item.get("rollback", not bool(item.get("accepted", False)))))
+            return float(rollbacks / max(1, len(decisions)))
+    return _mean_mapping(diagnosis.get("rollback_rate_by_method", {}))
 
 
 def _list_of_mappings(value: object) -> list[Mapping[str, object]]:
