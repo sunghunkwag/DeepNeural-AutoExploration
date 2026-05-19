@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Mapping
 
+from .meta_config_memory import MetaConfigMemory, apply_memory_guidance_to_config
 from .search_process_model import SearchProcessDiagnosis
 
 
@@ -95,6 +96,7 @@ class SearchStrategyMutator:
         self,
         diagnosis: SearchProcessDiagnosis,
         base_config: SearchStrategyConfig | None = None,
+        prior_meta_memory: MetaConfigMemory | None = None,
     ) -> SearchStrategyMutationPlan:
         base = base_config or SearchStrategyConfig()
         depth_thresholds = dict(base.depth_thresholds)
@@ -170,6 +172,23 @@ class SearchStrategyMutator:
             exploration_temperature=exploration,
             stagnation_window=base.stagnation_window,
         )
+        guidance: Dict[str, object] = {}
+        if prior_meta_memory is not None:
+            adjusted, guidance = apply_memory_guidance_to_config(
+                "search_strategy_config",
+                base.to_dict(),
+                mutated.to_dict(),
+                prior_meta_memory,
+            )
+            if guidance.get("avoided_harmful_config_patterns"):
+                selected.append("avoid_harmful_prior_config_pattern")
+                rationale.append("prior meta-config memory marked one or more proposed strategy changes as harmful")
+            if guidance.get("reused_successful_config_patterns"):
+                selected.append("reuse_successful_prior_config_pattern")
+                rationale.append("prior meta-config memory supports one or more proposed strategy changes")
+            if guidance.get("lower_confidence_neutral_patterns"):
+                rationale.append("prior neutral config changes lower confidence for repeated strategy mutations")
+            mutated = SearchStrategyConfig.from_dict(adjusted)
         return SearchStrategyMutationPlan(
             base_config=base.to_dict(),
             mutated_config=mutated.to_dict(),
@@ -182,6 +201,7 @@ class SearchStrategyMutator:
                 "probe_actionability_score": diagnosis.probe_actionability_score,
                 "architecture_complexity_growth": diagnosis.architecture_complexity_growth,
                 "transfer_regression_risk": diagnosis.transfer_regression_risk,
+                "meta_config_memory_guidance": guidance,
             },
             used_heldout_labels=False,
         )
