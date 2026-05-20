@@ -90,6 +90,151 @@ def _mode_config(mode: str) -> Dict[str, int | float | str]:
     }[mode]
 
 
+def _evaluate_candidate_worker(
+    candidate,
+    parent_genome,
+    parent_state_dict,
+    task_families,
+    evaluator,
+    parent_representation_probe,
+    parent_gradient_probe,
+    rollback_risk,
+    module_contribution_score,
+    objective_config,
+    seed,
+    generation,
+    proposal_index,
+    proposal_dict,
+):
+    import torch
+    from dataclasses import replace
+    from neural_search.weight_inheritance import inherit_shape_compatible_weights
+    from neural_search.representation_probe import probe_representations, RepresentationProbeResult
+    from neural_search.gradient_probe import probe_gradients, GradientProbeResult
+
+    try:
+        candidate_model = candidate.build_module()
+        parent_model = parent_genome.build_module()
+        parent_model.load_state_dict(parent_state_dict)
+
+        inheritance = inherit_shape_compatible_weights(parent_model, candidate_model)
+        candidate_eval = evaluator.train_and_validate(candidate, task_families, initial_model=candidate_model)
+
+        if candidate_eval.failed:
+            candidate_representation_probe = RepresentationProbeResult(
+                genome_id=candidate.genome_id,
+                activation_variance_by_module={},
+                representation_collapse_score=1.0,
+                task_embedding_separability=0.0,
+                hidden_state_similarity=1.0,
+                module_ablation_contribution={},
+            )
+            candidate_gradient_probe = GradientProbeResult(
+                genome_id=candidate.genome_id,
+                gradient_norm_by_module={},
+                total_gradient_norm=0.0,
+            )
+        else:
+            candidate_representation_probe = probe_representations(
+                candidate_eval.model,
+                task_families,
+                genome_id=candidate.genome_id,
+                validation_hidden_mismatch=_validation_hidden_mismatch(candidate_eval),
+            )
+            candidate_gradient_probe = probe_gradients(candidate_eval.model, task_families, genome_id=candidate.genome_id)
+
+        # Build parent evaluation to evaluate the decision correctly inside worker
+        parent_eval = evaluator.train_and_validate(parent_genome, task_families, initial_model=parent_model)
+
+        decision = evaluator.selection_decision(
+            parent_genome,
+            candidate,
+            parent_eval,
+            candidate_eval,
+            parent_representation_probe=parent_representation_probe,
+            candidate_representation_probe=candidate_representation_probe,
+            parent_gradient_probe=parent_gradient_probe,
+            candidate_gradient_probe=candidate_gradient_probe,
+            rollback_risk=rollback_risk,
+            module_contribution_score=module_contribution_score,
+            objective_config=objective_config,
+        )
+        
+        # Save state dict of the trained candidate model
+        model_state_dict = {k: v.cpu().clone() for k, v in candidate_model.state_dict().items()}
+        
+    except Exception as e:
+        # Fallback in case of unexpected errors in worker
+        from neural_search.multidomain_evaluator import MultiDomainEvaluation, CandidateSelectionDecision
+        train_by_family = {family.family: 999.0 for family in task_families}
+        val_by_family = {family.family: 999.0 for family in task_families}
+        hidden_by_family = {family.family: 999.0 for family in task_families}
+        candidate_eval = MultiDomainEvaluation(
+            genome_id=candidate.genome_id,
+            train_loss_by_family=train_by_family,
+            validation_loss_by_family=val_by_family,
+            hidden_validation_loss_by_family=hidden_by_family,
+            cross_domain_transfer_score=0.0,
+            generalization_gap=999.0,
+            adaptation_speed=0.0,
+            train_steps=evaluator.train_steps,
+            initial_train_loss=999.0,
+            final_train_loss=999.0,
+            model=None,
+            failed=True,
+        )
+        candidate_representation_probe = RepresentationProbeResult(
+            genome_id=candidate.genome_id,
+            activation_variance_by_module={},
+            representation_collapse_score=1.0,
+            task_embedding_separability=0.0,
+            hidden_state_similarity=1.0,
+            module_ablation_contribution={},
+        )
+        candidate_gradient_probe = GradientProbeResult(
+            genome_id=candidate.genome_id,
+            gradient_norm_by_module={},
+            total_gradient_norm=0.0,
+        )
+        decision = CandidateSelectionDecision(
+            candidate_id=candidate.genome_id,
+            parent_id=parent_genome.genome_id,
+            accepted=False,
+            rollback=True,
+            validation_improvement=-999.0,
+            hidden_validation_improvement=-999.0,
+            selection_score_delta=-999.0,
+            mutation_method=candidate.mutation_method,
+            random_seed=candidate.seed,
+            config_hash=candidate.config_hash,
+            validation_metrics={"loss": 999.0},
+            hidden_validation_metrics={"loss": 999.0},
+            rejection_reason="evaluation_failed",
+            selection_score_components={},
+            parent_selection_score=999.0,
+            candidate_selection_score=-999.0,
+            task_family_regressions={},
+        )
+        from neural_search.weight_inheritance import WeightInheritanceReport
+        inheritance = WeightInheritanceReport()
+        model_state_dict = {}
+
+    # Strip model to ensure everything is fully pickleable
+    candidate_eval = replace(candidate_eval, model=None)
+
+    return {
+        "candidate_id": candidate.genome_id,
+        "proposal_index": proposal_index,
+        "candidate_eval": candidate_eval,
+        "candidate_representation_probe": candidate_representation_probe,
+        "candidate_gradient_probe": candidate_gradient_probe,
+        "decision": decision,
+        "inheritance": inheritance,
+        "model_state_dict": model_state_dict,
+        "proposal_dict": proposal_dict,
+    }
+
+
 def run(
     mode: str,
     seed: int,
@@ -233,11 +378,13 @@ def run(
             credit_report=deep_output.credit_report,
             count=int(cfg["candidate_count"]),
         )
+        import concurrent.futures
+        import multiprocessing
+
+        parent_state_dict = {k: v.cpu().clone() for k, v in current_eval.model.state_dict().items()}
+
+        worker_args = []
         for proposal_index, proposal in enumerate(proposals):
-            parent_before = current_genome
-            parent_eval_before = current_eval
-            parent_representation_probe = representation_probe
-            parent_gradient_probe = gradient_probe
             candidate = proposal.candidate
             candidate_genomes.append(candidate.to_dict())
             mutation_proposals.append(proposal.to_dict())
@@ -252,16 +399,50 @@ def run(
                     "deep_search_decision_id": deep_decision.decision_id,
                 }
             )
-            candidate_model = candidate.build_module()
-            inheritance = inherit_shape_compatible_weights(current_eval.model, candidate_model)
-            candidate_eval = evaluator.train_and_validate(candidate, task_families, initial_model=candidate_model)
-            candidate_representation_probe = probe_representations(
-                candidate_eval.model,
+            worker_args.append((
+                candidate,
+                current_genome,
+                parent_state_dict,
                 task_families,
-                genome_id=candidate.genome_id,
-                validation_hidden_mismatch=_validation_hidden_mismatch(candidate_eval),
-            )
-            candidate_gradient_probe = probe_gradients(candidate_eval.model, task_families, genome_id=candidate.genome_id)
+                evaluator,
+                representation_probe,
+                gradient_probe,
+                deep_decision.rollback_risk,
+                deep_output.credit_report.module_contribution_score,
+                next_cfg.evaluator_objective_config if next_cfg is not None else None,
+                seed,
+                generation,
+                proposal_index,
+                proposal.to_dict(),
+            ))
+
+        max_workers = max(1, min(len(worker_args), multiprocessing.cpu_count()))
+        parallel_results = []
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(_evaluate_candidate_worker, *args) for args in worker_args]
+            for future in concurrent.futures.as_completed(futures):
+                parallel_results.append(future.result())
+
+        # Sort back to preserve the original sequence of proposals
+        parallel_results.sort(key=lambda r: r["proposal_index"])
+
+        for res in parallel_results:
+            proposal_index = res["proposal_index"]
+            proposal = proposals[proposal_index]
+            candidate = proposal.candidate
+            candidate_eval = res["candidate_eval"]
+            candidate_representation_probe = res["candidate_representation_probe"]
+            candidate_gradient_probe = res["candidate_gradient_probe"]
+            inheritance = res["inheritance"]
+            model_state_dict = res["model_state_dict"]
+
+            parent_before = current_genome
+            parent_eval_before = current_eval
+            parent_representation_probe = representation_probe
+            parent_gradient_probe = gradient_probe
+
+            # Re-evaluate the selection decision against the current_genome/current_eval
+            # which might have updated in this loop
             decision = evaluator.selection_decision(
                 current_genome,
                 candidate,
@@ -275,6 +456,7 @@ def run(
                 module_contribution_score=deep_output.credit_report.module_contribution_score,
                 objective_config=next_cfg.evaluator_objective_config if next_cfg is not None else None,
             )
+
             decision_dict = decision.to_dict()
             decision_dict["generation"] = generation
             decision_dict["proposal_index"] = proposal_index
@@ -285,6 +467,7 @@ def run(
             decision_dict["candidate_representation_probe"] = candidate_representation_probe.to_dict()
             decision_dict["candidate_gradient_probe"] = candidate_gradient_probe.to_dict()
             architecture_decisions.append(decision_dict)
+
             selection_score_components.append(
                 {
                     "generation": generation,
@@ -295,6 +478,7 @@ def run(
                     "selection_score_delta": decision.selection_score_delta,
                 }
             )
+
             generation_candidate_table.append(
                 {
                     "generation": generation,
@@ -309,15 +493,22 @@ def run(
                     "rejection_reason": decision.rejection_reason,
                 }
             )
+
             inheritance_reports.append(inheritance.to_dict())
             failure_residue_ids: List[str] = []
+
             if decision.accepted:
                 current_genome = candidate
                 current_eval = candidate_eval
+                # Reconstruct candidate model in main process
+                current_eval.model = candidate.build_module()
+                current_eval.model.load_state_dict(model_state_dict)
+
                 representation_probe = candidate_representation_probe
                 gradient_probe = candidate_gradient_probe
                 probe_results_after_accepted.append(candidate_representation_probe.to_dict())
                 gradient_probe_results_after_accepted.append(candidate_gradient_probe.to_dict())
+
                 accepted_probe_residues = extractor.extract_many(
                     representation_failures_to_traces(
                         candidate_representation_probe,
@@ -348,6 +539,7 @@ def run(
                         "task_family_regressions": decision.task_family_regressions,
                     }
                 )
+
             history.add(
                 parent=parent_before,
                 candidate=candidate,

@@ -29,6 +29,7 @@ class MultiDomainEvaluation:
     final_train_loss: float = 0.0
     heldout_test_evaluated_after_freeze: bool = False
     model: Optional[torch.nn.Module] = field(default=None, repr=False, compare=False)
+    failed: bool = False
 
     @property
     def validation_loss(self) -> float:
@@ -67,6 +68,7 @@ class MultiDomainEvaluation:
             "initial_train_loss": self.initial_train_loss,
             "final_train_loss": self.final_train_loss,
             "heldout_test_evaluated_after_freeze": self.heldout_test_evaluated_after_freeze,
+            "failed": self.failed,
         }
         if include_model:
             data["model"] = self.model
@@ -132,44 +134,64 @@ class MultiDomainEvaluator:
         *,
         initial_model: Optional[torch.nn.Module] = None,
     ) -> MultiDomainEvaluation:
-        set_deterministic_seed(self.seed + genome.seed)
-        model = initial_model if initial_model is not None else genome.build_module()
-        model.train()
-        optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
-        train_batches = [family.splits["train"] for family in task_families]
-        initial_train_loss = self._mean_loss(model, train_batches)
-        first_step_loss = initial_train_loss
-        for step in range(self.train_steps):
-            for batch in train_batches:
-                optimizer.zero_grad()
-                loss = F.mse_loss(model(batch.x), batch.y)
-                if not torch.isfinite(loss):
-                    raise FloatingPointError("non-finite multi-domain train loss")
-                loss.backward()
-                optimizer.step()
-            if step == 0:
-                first_step_loss = self._mean_loss(model, train_batches)
-        model.eval()
-        final_train_loss = self._mean_loss(model, train_batches)
-        train_by_family = self._loss_by_family(model, task_families, "train")
-        val_by_family = self._loss_by_family(model, task_families, "validation")
-        hidden_by_family = self._loss_by_family(model, task_families, "hidden_validation")
-        train_mean = _mean_dict(train_by_family)
-        hidden_mean = _mean_dict(hidden_by_family)
-        adaptation_speed = max(0.0, initial_train_loss - first_step_loss) / max(1, self.train_steps)
-        return MultiDomainEvaluation(
-            genome_id=genome.genome_id,
-            train_loss_by_family=train_by_family,
-            validation_loss_by_family=val_by_family,
-            hidden_validation_loss_by_family=hidden_by_family,
-            cross_domain_transfer_score=1.0 / (1.0 + hidden_mean),
-            generalization_gap=hidden_mean - train_mean,
-            adaptation_speed=adaptation_speed,
-            train_steps=self.train_steps,
-            initial_train_loss=initial_train_loss,
-            final_train_loss=final_train_loss,
-            model=model,
-        )
+        try:
+            set_deterministic_seed(self.seed + genome.seed)
+            model = initial_model if initial_model is not None else genome.build_module()
+            model.train()
+            optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
+            train_batches = [family.splits["train"] for family in task_families]
+            initial_train_loss = self._mean_loss(model, train_batches)
+            first_step_loss = initial_train_loss
+            for step in range(self.train_steps):
+                for batch in train_batches:
+                    optimizer.zero_grad()
+                    loss = F.mse_loss(model(batch.x), batch.y)
+                    if not torch.isfinite(loss):
+                        raise FloatingPointError("non-finite multi-domain train loss")
+                    loss.backward()
+                    optimizer.step()
+                if step == 0:
+                    first_step_loss = self._mean_loss(model, train_batches)
+            model.eval()
+            final_train_loss = self._mean_loss(model, train_batches)
+            train_by_family = self._loss_by_family(model, task_families, "train")
+            val_by_family = self._loss_by_family(model, task_families, "validation")
+            hidden_by_family = self._loss_by_family(model, task_families, "hidden_validation")
+            train_mean = _mean_dict(train_by_family)
+            hidden_mean = _mean_dict(hidden_by_family)
+            adaptation_speed = max(0.0, initial_train_loss - first_step_loss) / max(1, self.train_steps)
+            return MultiDomainEvaluation(
+                genome_id=genome.genome_id,
+                train_loss_by_family=train_by_family,
+                validation_loss_by_family=val_by_family,
+                hidden_validation_loss_by_family=hidden_by_family,
+                cross_domain_transfer_score=1.0 / (1.0 + hidden_mean),
+                generalization_gap=hidden_mean - train_mean,
+                adaptation_speed=adaptation_speed,
+                train_steps=self.train_steps,
+                initial_train_loss=initial_train_loss,
+                final_train_loss=final_train_loss,
+                model=model,
+            )
+        except Exception as e:
+            # Gracefully handle training errors or dimensional mismatches by returning a failed evaluation record
+            train_by_family = {family.family: 999.0 for family in task_families}
+            val_by_family = {family.family: 999.0 for family in task_families}
+            hidden_by_family = {family.family: 999.0 for family in task_families}
+            return MultiDomainEvaluation(
+                genome_id=genome.genome_id,
+                train_loss_by_family=train_by_family,
+                validation_loss_by_family=val_by_family,
+                hidden_validation_loss_by_family=hidden_by_family,
+                cross_domain_transfer_score=0.0,
+                generalization_gap=999.0,
+                adaptation_speed=0.0,
+                train_steps=self.train_steps,
+                initial_train_loss=999.0,
+                final_train_loss=999.0,
+                model=initial_model,
+                failed=True,
+            )
 
     def evaluate_heldout_after_freeze(
         self,
@@ -214,6 +236,26 @@ class MultiDomainEvaluator:
         module_contribution_score: float = 0.0,
         objective_config: object | None = None,
     ) -> CandidateSelectionDecision:
+        if candidate_eval.failed:
+            return CandidateSelectionDecision(
+                candidate_id=candidate.genome_id,
+                parent_id=parent.genome_id,
+                accepted=False,
+                rollback=True,
+                validation_improvement=-999.0,
+                hidden_validation_improvement=-999.0,
+                selection_score_delta=-999.0,
+                mutation_method=candidate.mutation_method,
+                random_seed=candidate.seed,
+                config_hash=candidate.config_hash,
+                validation_metrics={"loss": 999.0},
+                hidden_validation_metrics={"loss": 999.0},
+                rejection_reason="evaluation_failed",
+                selection_score_components={},
+                parent_selection_score=float(parent_eval.selection_score() if not parent_eval.failed else 999.0),
+                candidate_selection_score=-999.0,
+                task_family_regressions={},
+            )
         validation_improvement = parent_eval.validation_loss - candidate_eval.validation_loss
         hidden_improvement = parent_eval.hidden_validation_loss - candidate_eval.hidden_validation_loss
         transfer_delta = candidate_eval.cross_domain_transfer_score - parent_eval.cross_domain_transfer_score
