@@ -25,8 +25,9 @@ Selected same-shape ARC-AGI-1 results:
 | ARC exact-grid accuracy | quick/42 | `0.000` | `0.400` | `+0.400` |
 
 ### Bounded Claims
-- **Supported**: Bounded model candidate mutation, training, probing, evaluation, and rollback on validation tasks.
-- **Unsupported**: Not AGI, not a proof of open-ended technological singularity, and not an official ARC leaderboard solver.
+
+- **Supported**: Bounded model candidate mutation, training, probing, evaluation, and rollback on validation tasks. The repository allows the user to inspect loops that generate bounded operator programs.
+- **Unsupported**: This repository is **not AGI**, not human-level intelligence, and not a technological singularity system. It does not prove open-ended autonomous recursive self-improvement. It is a research scaffold for testing **code-level** mutations and operator programs under verification rules.
 
 ---
 

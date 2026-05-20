@@ -381,6 +381,9 @@ def run(
         import concurrent.futures
         import multiprocessing
 
+        # Force spawn context to avoid PyTorch fork-deadlocks on Unix/Linux
+        ctx = multiprocessing.get_context("spawn")
+
         parent_state_dict = {k: v.cpu().clone() for k, v in current_eval.model.state_dict().items()}
 
         worker_args = []
@@ -418,7 +421,7 @@ def run(
 
         max_workers = max(1, min(len(worker_args), multiprocessing.cpu_count()))
         parallel_results = []
-        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
             futures = [executor.submit(_evaluate_candidate_worker, *args) for args in worker_args]
             for future in concurrent.futures.as_completed(futures):
                 parallel_results.append(future.result())
