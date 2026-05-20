@@ -25,7 +25,7 @@ python -m pytest -q
 # 259 passed
 ```
 
-The autonomous neural exploration loop now includes an evidence-guided deep search layer and a post-freeze meta-meta-meta search controller. The deep search layer uses failure residues, representation and gradient probes, validation/hidden-validation trends, rollback reasons, architecture complexity, and module contribution signals to select bounded mutation depth and mutation families. The meta-meta-meta layer diagnoses the search process itself, proposes bounded next-run search/evaluator/curriculum config changes, runs the next experiment, attributes which config changes likely helped or harmed, evaluates decision quality, records bounded JSON config memory, and emits explicit next-run trust/revise/revert recommendations. Candidate selection remains validation/hidden-validation gated, and held-out test labels are evaluated only after candidate freeze.
+The autonomous neural exploration loop now includes parallel candidate evaluation via multiprocessing, robust fault tolerance to catch training/shape mismatch errors, an evidence-guided deep search layer, and a post-freeze meta-meta-meta search controller. The deep search layer uses failure residues, representation and gradient probes, validation/hidden-validation trends, rollback reasons, architecture complexity, and module contribution signals to select bounded mutation depth and mutation families. The meta-meta-meta layer diagnoses the search process itself, proposes bounded next-run search/evaluator/curriculum config changes, runs the next experiment, attributes which config changes likely helped or harmed, evaluates decision quality, records bounded JSON config memory, and emits explicit next-run trust/revise/revert recommendations. Candidate selection remains validation/hidden-validation gated, and held-out test labels are evaluated only after candidate freeze.
 
 ## Main Components
 
@@ -150,7 +150,7 @@ pip install pytest
 ## Supported Claims
 
 - Bounded operator/program candidates can be generated, validated, accepted or rejected, rolled back, reused, and evaluated on held-out tasks.
-- Bounded neural architecture candidates can be mutated, trained across procedural task families, probed for representation and gradient failures, selected on validation/hidden-validation evidence, rolled back, frozen, and then evaluated on held-out transfer splits.
+- Bounded neural architecture candidates can be mutated, trained across procedural task families in parallel processes using CPU multiprocessing, with robust error catching to automatically reject faulty architecture candidates. Candidates can be probed for representation and gradient failures, selected on validation/hidden-validation evidence, rolled back, frozen, and evaluated on held-out transfer splits.
 - The ARC adapter shows measured held-out improvement on a disclosed public same-shape subset.
 - The repository includes anti-cheat checks for split leakage, query-target storage, hidden-validation acceptance, deterministic replay, dead code, and control policies.
 - The research-goal controller can generate auditable next objectives from benchmark evidence.
