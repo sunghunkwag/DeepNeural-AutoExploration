@@ -70,6 +70,22 @@ python benchmarks/long_horizon_autonomous_exploration.py --mode full --seed 42 -
 
 ---
 
+## 📖 Documentation
+
+For detailed analysis, reports, and plans, refer to:
+- [External RSI Evidence Report](docs/rsi_external_evidence_report.md)
+- [Research-Goal Generation Integration](docs/research_goal_generation_integration.md)
+- [Next Architecture Upgrade Plan](docs/next_architecture_upgrade_plan.md)
+- [Deep Neural Autonomous Exploration Upgrade](docs/deep_neural_autonomous_exploration_upgrade.md)
+- [Long-Horizon Autonomous Exploration Report](docs/long_horizon_autonomous_exploration_report.md)
+- [Long-Horizon Seed-42 Failure Analysis](docs/long_horizon_failure_analysis_seed42.md)
+- [Long-Horizon Repair & Memory Ablation Report](docs/long_horizon_repair_and_ablation_report.md)
+- [ARC Seed-44 Failure Residue Report](docs/arc_seed44_failure_residue_report.md)
+- [Interaction Operating Scaffold](docs/interaction_operating_scaffold.md)
+- [Interaction Residue Layer](docs/interaction_residue_layer.md)
+
+---
+
 ## 📄 License
 
 Apache License 2.0.
